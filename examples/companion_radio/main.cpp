@@ -171,7 +171,7 @@ void setup() {
     #endif
   );
 #elif defined(ESP32)
-  SPIFFS.begin(true);
+  SPIFFS.begin(true, "/spiffs", 10, "mc_spiffs");
   store.begin();
   the_mesh.begin(
     #ifdef DISPLAY_CLASS
