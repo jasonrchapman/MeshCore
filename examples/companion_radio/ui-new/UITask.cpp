@@ -31,6 +31,10 @@
 
 #include "icons.h"
 
+#if defined(MESHCORE_DUALBOOT) && defined(BLE_PIN_CODE)
+const char* getCachedBleMacStr();  // src/helpers/esp32/SerialBLEInterface.cpp
+#endif
+
 static const char* monthShortName(int m) {
   static const char* names[] = {"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
   return (m >= 1 && m <= 12) ? names[m - 1] : "???";
@@ -227,9 +231,17 @@ public:
 
     if (_page == HomePage::FIRST) {
       display.setColor(UIColor::primary_txt);
-      display.setTextSize(2);
-      sprintf(tmp, "MSG: %d", _task->getMsgCount());
-      display.drawTextCentered(display.width() / 2, 22, tmp);
+#if defined(MESHCORE_DUALBOOT) && defined(BLE_PIN_CODE)
+      if (!_task->hasConnection() && the_mesh.getBLEPin() != 0) {
+        display.setTextSize(1);
+        display.drawTextCentered(display.width() / 2, 26, getCachedBleMacStr());  // 17 chars
+      } else
+#endif
+      {
+        display.setTextSize(2);
+        sprintf(tmp, "MSG: %d", _task->getMsgCount());
+        display.drawTextCentered(display.width() / 2, 22, tmp);
+      }
 
       #ifdef WIFI_SSID
         IPAddress ip = WiFi.localIP();
