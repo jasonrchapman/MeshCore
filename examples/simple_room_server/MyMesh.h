@@ -104,6 +104,10 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   unsigned long dirty_contacts_expiry;
   uint8_t reply_data[MAX_PACKET_PAYLOAD];
   unsigned long next_push;
+#ifdef ESP32
+  unsigned long next_storage_poll = 0;
+  size_t _cached_spiffs_used = 0;
+#endif
   uint16_t _num_posted, _num_post_pushes;
   int next_client_idx;  // for round-robin polling
   int next_post_idx;
@@ -187,6 +191,35 @@ public:
   NodePrefs* getNodePrefs() {
     return &_prefs;
   }
+
+  int getNumRegisteredClients() { return acl.getNumRegistered(); }
+  int getNumActiveClients() { return acl.getNumActiveClients(getRTCClock()->getCurrentTime(), 86400); }
+  uint32_t getLastAdminActivity() { return acl.getLastAdminActivity(); }
+
+  int getPostQueueOccupancy() const {
+    int count = 0;
+    for (int i = 0; i < MAX_UNSYNCED_POSTS; i++) if (posts[i].post_timestamp != 0) count++;
+    return count;
+  }
+
+  uint32_t getOldestQueuedPostAge() {
+    uint32_t oldest = 0;
+    for (int i = 0; i < MAX_UNSYNCED_POSTS; i++) {
+      uint32_t t = posts[i].post_timestamp;
+      if (t != 0 && (oldest == 0 || t < oldest)) oldest = t;
+    }
+    return oldest == 0 ? 0 : getRTCClock()->getCurrentTime() - oldest;
+  }
+
+#ifdef ESP32
+  size_t getCachedSpiffsUsedBytes() {  // polled every 30s, not every render
+    if (millisHasNowPassed(next_storage_poll)) {
+      _cached_spiffs_used = SPIFFS.usedBytes();
+      next_storage_poll = futureMillis(30000);
+    }
+    return _cached_spiffs_used;
+  }
+#endif
 
   void savePrefs() override {
     _cli.savePrefs(_fs);
