@@ -440,6 +440,16 @@ public:
         y = y + 12;
         display.setColor(UIColor::secondary_txt);
         display.drawTextLeftAlign(0, y, "sat");
+        float hdop = nmea->getHDOP();
+        if (hdop >= 0) {
+          // 10 segments, more filled = better accuracy (lower HDOP)
+          int filled = hdop <= 1.0f ? 10 : (int)(10.0f / hdop);
+          display.setColor(UIColor::primary_txt);
+          for (int i = 0; i < 10; i++) {
+            if (i < filled) display.fillRect(24 + i * 4, y, 3, 6);
+            else            display.drawRect(24 + i * 4, y, 3, 6);
+          }
+        }
         display.setColor(UIColor::primary_txt);
         sprintf(buf, "%d", nmea->satellitesCount());
         display.drawTextRightAlign(display.width()-1, y, buf);
