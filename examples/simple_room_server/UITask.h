@@ -9,6 +9,18 @@ class UITask {
   int _prevBtnState;
   NodePrefs* _node_prefs;
   char _version_info[32];
+  unsigned long _started_at = 0;  // this role's UI never tracked uptime before
+  enum Page {
+    PAGE_IDENTITY, PAGE_MEMBERS, PAGE_STORAGE, PAGE_TRAFFIC, PAGE_SYSTEM,
+#if ENV_INCLUDE_GPS == 1
+    PAGE_GPS,
+#endif
+    PAGE_COUNT
+  };
+  uint8_t _page = PAGE_IDENTITY;
+
+  void drawHeader(const char* title);
+  void drawBreadcrumb();
 
   void renderCurrScreen();
 public:
