@@ -33,6 +33,11 @@
 
 #include "icons.h"
 
+static const char* monthShortName(int m) {
+  static const char* names[] = {"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
+  return (m >= 1 && m <= 12) ? names[m - 1] : "???";
+}
+
 class SplashScreen : public UIScreen {
   UITask* _task;
   unsigned long dismiss_after;
@@ -93,6 +98,7 @@ class HomeScreen : public UIScreen {
     RADIO,
     BLUETOOTH,
     ADVERT,
+    CLOCK,
 #if ENV_INCLUDE_GPS == 1
     GPS,
 #endif
@@ -385,6 +391,26 @@ public:
       display.drawXbm((display.width() - 32) / 2, 18, advert_icon, 32, 32);
       display.setColor(UIColor::secondary_txt);
       display.drawTextCentered(display.width() / 2, 64 - 11, "advert: " PRESS_LABEL);
+    } else if (_page == HomePage::CLOCK) {
+      // UTC. Same RTC the rest of this file reads; on ESP32 it holds a boot-time seed
+      // until GPS or the app sets the time.
+      uint32_t now = _rtc->getCurrentTime();
+      char hhmm[8], secs[4], date[16];
+      sprintf(hhmm, "%02lu:%02lu", (unsigned long)((now % 86400UL) / 3600), (unsigned long)((now % 3600UL) / 60));
+      sprintf(secs, ":%02lu", (unsigned long)(now % 60));
+      display.setColor(UIColor::primary_txt);
+      display.setTextSize(3);
+      int w = display.getTextWidth(hhmm);
+      int x = (display.width() - w - display.getTextWidth(":00") / 3) / 2;  // room for small seconds
+      display.setCursor(x, 22);
+      display.print(hhmm);
+      display.setTextSize(1);
+      display.setCursor(x + w + 2, 36);
+      display.print(secs);
+      DateTime dt(now);
+      sprintf(date, "%02d %s %d", dt.day(), monthShortName(dt.month()), dt.year());
+      display.drawTextCentered(display.width() / 2, 54, date);
+      return 1000;  // HomeScreen normally re-renders every 5000ms; the clock needs 1s
 #if ENV_INCLUDE_GPS == 1
     } else if (_page == HomePage::GPS) {
       LocationProvider* nmea = sensors.getLocationProvider();
