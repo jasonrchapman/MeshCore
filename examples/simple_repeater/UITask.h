@@ -12,6 +12,8 @@ class UITask {
   char _version_info[32];
   unsigned long _powering_off_at = 0;
   unsigned long _started_at = 0;
+  uint16_t _batt_mv = 0;
+  unsigned long _next_batt_read = 0;
 
   enum Page {
     PAGE_IDENTITY, PAGE_TRAFFIC, PAGE_SIGNAL, PAGE_SYSTEM,

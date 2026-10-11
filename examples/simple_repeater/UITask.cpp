@@ -86,7 +86,11 @@ void UITask::drawHeader(const char* title) {
   _display->setTextSize(1);
   _display->setColor(UIColor::primary_txt);
 
-  sprintf(buf, "%d%%", battPercent(_board->getBattMilliVolts()));
+  if (millis() >= _next_batt_read) {  // the ADC read is slow on some boards; 10s is plenty
+    _batt_mv = _board->getBattMilliVolts();
+    _next_batt_read = millis() + 10000;
+  }
+  sprintf(buf, "%d%%", battPercent(_batt_mv));
   _display->setCursor(0, 0);
   _display->print(buf);
 
