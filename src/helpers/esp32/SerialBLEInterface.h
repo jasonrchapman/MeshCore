@@ -87,6 +87,9 @@ public:
   size_t checkRecvFrame(uint8_t dest[]) override;
 };
 
+// Dual-boot BLE random-static MAC as "XX:XX:XX:XX:XX:XX"; placeholder until set.
+const char* getCachedBleMacStr();
+
 #if BLE_DEBUG_LOGGING && ARDUINO
   #include <Arduino.h>
   #define BLE_DEBUG_PRINT(F, ...) Serial.printf("BLE: " F, ##__VA_ARGS__)
