@@ -10,6 +10,7 @@
 
 #define ADVERT_RESTART_DELAY  1000   // millis
 
+#ifdef MESHCORE_DUALBOOT
 // Dual-boot: a random static address derived from the efuse MAC, so MeshCore has its own
 // BLE identity separate from Meshtastic and the phone keeps two independent bonds.
 static void applyRandomStaticAddress(BLEServer* server) {
@@ -23,6 +24,7 @@ static void applyRandomStaticAddress(BLEServer* server) {
   addr[0] |= 0xC0;
   server->getAdvertising()->setDeviceAddress(addr, BLE_ADDR_TYPE_RANDOM);
 }
+#endif
 
 void SerialBLEInterface::begin(const char* prefix, char* name, uint32_t pin_code) {
   _pin_code = pin_code;
@@ -163,7 +165,9 @@ void SerialBLEInterface::enable() {
   //pServer->getAdvertising()->setMinInterval(500);
   //pServer->getAdvertising()->setMaxInterval(1000);
 
+#ifdef MESHCORE_DUALBOOT
   applyRandomStaticAddress(pServer);
+#endif
   pServer->getAdvertising()->start();
   adv_restart_time = 0;
 }
@@ -254,7 +258,9 @@ size_t SerialBLEInterface::checkRecvFrame(uint8_t dest[]) {
   if (adv_restart_time && millis() >= adv_restart_time) {
     if (pServer->getConnectedCount() == 0) {
       BLE_DEBUG_PRINTLN("SerialBLEInterface -> re-starting advertising");
+#ifdef MESHCORE_DUALBOOT
       applyRandomStaticAddress(pServer);
+#endif
   pServer->getAdvertising()->start();  // re-Start advertising
     }
     adv_restart_time = 0;
