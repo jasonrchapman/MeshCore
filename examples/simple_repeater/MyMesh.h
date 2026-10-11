@@ -196,6 +196,7 @@ public:
 
   uint32_t getLastHeardMillis() const { return _last_heard_ms; }
   uint32_t getLastAdminActivity() { return acl.getLastAdminActivity(); }
+  uint32_t getUptimeSecs() const { return (uint32_t)(uptime_millis / 1000); }
   uint8_t getTxBudgetPercent() {
     // same max-budget formula Dispatcher.cpp uses when it refills tx_budget_ms
     unsigned long max_budget = (unsigned long)(getDutyCycleWindowMs() * (1.0f / (1.0f + getAirtimeBudgetFactor())));

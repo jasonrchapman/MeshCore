@@ -197,7 +197,7 @@ void UITask::renderCurrScreen() {
         drawHeader("SYSTEM");
         drawBreadcrumb();
         _display->setCursor(0, 16);
-        unsigned long up = (millis() - _started_at) / 1000;
+        unsigned long up = the_mesh.getUptimeSecs();  // 64-bit based, no 49-day wrap
         sprintf(tmp, "Up %lud %02lu:%02lu", up / 86400, (up % 86400) / 3600, (up % 3600) / 60);
         _display->print(tmp);
 #ifdef ESP32
@@ -209,8 +209,10 @@ void UITask::renderCurrScreen() {
         _display->print(_version_info);
         _display->setCursor(0, 52);
         uint32_t la = the_mesh.getLastAdminActivity();  // since boot (not persisted)
+        uint32_t now = the_mesh.getRTCClock()->getCurrentTime();
         if (la == 0) strcpy(tmp, "Admin: never");
-        else formatAgo(tmp, "Admin: ", the_mesh.getRTCClock()->getCurrentTime() - la);
+        else if (now < la || now - la > the_mesh.getUptimeSecs()) strcpy(tmp, "Admin: this boot");  // RTC jumped
+        else formatAgo(tmp, "Admin: ", now - la);
         _display->print(tmp);
         break;
       }
