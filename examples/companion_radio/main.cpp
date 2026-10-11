@@ -171,7 +171,11 @@ void setup() {
     #endif
   );
 #elif defined(ESP32)
-  SPIFFS.begin(true, "/spiffs", 10, "mc_spiffs");
+#ifdef MESHCORE_DUALBOOT
+  SPIFFS.begin(true, "/spiffs", 10, "mc_spiffs");  // dual-boot table: MeshCore's own partition label
+#else
+  SPIFFS.begin(true);                               // stock table: default "spiffs" label, same as upstream
+#endif
   store.begin();
   the_mesh.begin(
     #ifdef DISPLAY_CLASS
