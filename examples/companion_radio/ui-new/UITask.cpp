@@ -33,7 +33,7 @@
 
 #include "icons.h"
 
-#if defined(MESHCORE_DUALBOOT) && defined(BLE_PIN_CODE)
+#if defined(ESP32) && defined(BLE_PIN_CODE)
 const char* getCachedBleMacStr();  // src/helpers/esp32/SerialBLEInterface.cpp
 #endif
 
@@ -313,7 +313,7 @@ public:
       display.drawTextCentered(display.width() / 2, 22, tmp);
       #else
       // larger unread message ui for non wifi variants
-#if defined(MESHCORE_DUALBOOT) && defined(BLE_PIN_CODE)
+#if defined(ESP32) && defined(BLE_PIN_CODE)
       if (!pairingLinkConnected(_task) && the_mesh.getBLEPin() != 0) {
         display.setTextSize(1);
         display.drawTextCentered(display.width() / 2, 26, getCachedBleMacStr());  // 17 chars

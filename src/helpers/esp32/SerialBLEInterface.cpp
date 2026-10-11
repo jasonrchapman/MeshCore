@@ -12,6 +12,11 @@
 
 static char s_cached_ble_mac[18] = "--:--:--:--:--:--";
 
+static void cacheBleMac(const uint8_t* addr) {
+  snprintf(s_cached_ble_mac, sizeof(s_cached_ble_mac), "%02X:%02X:%02X:%02X:%02X:%02X",
+           addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
+}
+
 #ifdef MESHCORE_DUALBOOT
 // Dual-boot: a random static address derived from the efuse MAC, so MeshCore has its own
 // BLE identity separate from Meshtastic and the phone keeps two independent bonds.
@@ -25,8 +30,7 @@ static void applyRandomStaticAddress(BLEServer* server) {
   addr[5] ^= 0x3C;
   addr[0] |= 0xC0;
   server->getAdvertising()->setDeviceAddress(addr, BLE_ADDR_TYPE_RANDOM);
-  snprintf(s_cached_ble_mac, sizeof(s_cached_ble_mac), "%02X:%02X:%02X:%02X:%02X:%02X",
-           addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
+  cacheBleMac(addr);
 }
 #endif
 
@@ -47,6 +51,10 @@ void SerialBLEInterface::begin(const char* prefix, char* name, uint32_t pin_code
 
   // Create the BLE Device
   BLEDevice::init(dev_name);
+#ifndef MESHCORE_DUALBOOT
+  // Stock builds advertise with the controller's own public address; cache it for display.
+  cacheBleMac(*BLEDevice::getAddress().getNative());
+#endif
   BLEDevice::setSecurityCallbacks(this);
   BLEDevice::setMTU(MAX_FRAME_SIZE);
 
