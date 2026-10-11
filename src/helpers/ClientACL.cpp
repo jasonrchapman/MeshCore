@@ -141,3 +141,25 @@ bool ClientACL::applyPermissions(const mesh::LocalIdentity& self_id, const uint8
   }
   return true;
 }
+
+int ClientACL::getNumRegistered() const {
+  return num_clients;  // every entry is a real client, guests included (see applyPermissions)
+}
+
+int ClientACL::getNumActiveClients(uint32_t now, uint32_t within_secs) const {
+  int count = 0;
+  for (int i = 0; i < num_clients; i++) {
+    const ClientInfo& c = clients[i];
+    if (c.isAdmin() || c.last_activity == 0) continue;
+    if (now - c.last_activity < within_secs) count++;
+  }
+  return count;
+}
+
+uint32_t ClientACL::getLastAdminActivity() const {
+  uint32_t latest = 0;
+  for (int i = 0; i < num_clients; i++) {
+    if (clients[i].isAdmin() && clients[i].last_activity > latest) latest = clients[i].last_activity;
+  }
+  return latest;
+}
