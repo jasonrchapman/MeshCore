@@ -2,6 +2,29 @@
 #include "target.h"
 #include <Arduino.h>
 #include <helpers/CommonCLI.h>
+#include "MyMesh.h"
+extern MyMesh the_mesh;
+
+#ifndef BATT_MIN_MILLIVOLTS
+  #define BATT_MIN_MILLIVOLTS 3000
+#endif
+#ifndef BATT_MAX_MILLIVOLTS
+  #define BATT_MAX_MILLIVOLTS 4200
+#endif
+
+// Same math as the companion's renderBatteryIndicator().
+static int battPercent(uint16_t mv) {
+  int pct = ((int)mv - BATT_MIN_MILLIVOLTS) * 100 / (BATT_MAX_MILLIVOLTS - BATT_MIN_MILLIVOLTS);
+  return pct < 0 ? 0 : (pct > 100 ? 100 : pct);
+}
+
+// Compact "ago" like the companion's Recent list: 14s / 5m / 3h / 2d.
+static void formatAgo(char* buf, const char* label, uint32_t secs) {
+  if (secs < 60)         sprintf(buf, "%s%lus", label, (unsigned long)secs);
+  else if (secs < 3600)  sprintf(buf, "%s%lum", label, (unsigned long)(secs / 60));
+  else if (secs < 86400) sprintf(buf, "%s%luh", label, (unsigned long)(secs / 3600));
+  else                   sprintf(buf, "%s%lud", label, (unsigned long)(secs / 86400));
+}
 
 #ifndef USER_BTN_PRESSED
 #define USER_BTN_PRESSED LOW
@@ -53,6 +76,33 @@ void UITask::begin(NodePrefs* node_prefs, const char* build_date, const char* fi
   free(version);
 }
 
+void UITask::drawHeader(const char* title) {
+  char buf[8];
+  _display->setTextSize(1);
+  _display->setColor(UIColor::primary_txt);
+
+  sprintf(buf, "%d%%", battPercent(_board->getBattMilliVolts()));
+  _display->setCursor(0, 0);
+  _display->print(buf);
+
+  _display->drawTextCentered(_display->width() / 2, 0, title);
+
+  // UTC. Shows whatever the RTC holds; on ESP32 that is a fixed boot-time seed until
+  // GPS or an admin `time` command sets it - same as the companion's clock today.
+  uint32_t now = the_mesh.getRTCClock()->getCurrentTime();
+  sprintf(buf, "%02lu:%02lu", (unsigned long)((now % 86400UL) / 3600), (unsigned long)((now % 3600UL) / 60));
+  _display->drawTextRightAlign(_display->width() - 1, 0, buf);
+}
+
+void UITask::drawBreadcrumb() {
+  int y = 10;
+  int x = _display->width() / 2 - 5 * (PAGE_COUNT - 1);
+  for (uint8_t i = 0; i < PAGE_COUNT; i++, x += 10) {
+    if (i == _page) _display->fillRect(x - 1, y - 1, 4, 4);
+    else            _display->fillRect(x, y, 2, 2);
+  }
+}
+
 void UITask::renderCurrScreen() {
   char tmp[80];
   if (millis() < _started_at + BOOT_SCREEN_MILLIS) { // boot screen
@@ -92,20 +142,24 @@ void UITask::renderCurrScreen() {
     _display->setCursor((_display->width() - poffWidth) / 2, 48);
     _display->drawTextCentered(_display->width()/2, 48, poweroff_string);
   } else {
-    _display->setCursor(0, 0);
-    _display->setTextSize(1);
-    _display->setColor(UIColor::primary_txt);
-    _display->print(_node_prefs->node_name);
-
-    // freq / sf
-    _display->setCursor(0, 20);
-    sprintf(tmp, "FREQ: %06.3f SF%d", _node_prefs->freq, _node_prefs->sf);
-    _display->print(tmp);
-
-    // bw / cr
-    _display->setCursor(0, 30);
-    sprintf(tmp, "BW: %03.2f CR: %d", _node_prefs->bw, _node_prefs->cr);
-    _display->print(tmp);
+    switch (_page) {
+      case PAGE_IDENTITY:
+        drawHeader("IDENTITY");
+        drawBreadcrumb();
+        _display->drawTextEllipsized(0, 16, _display->width(), _node_prefs->node_name);
+        _display->setCursor(0, 28);
+        _display->print("< Repeater >");
+        _display->setCursor(0, 40);
+        sprintf(tmp, "F:%07.3f SF%d", _node_prefs->freq, _node_prefs->sf);
+        _display->print(tmp);
+        _display->setCursor(0, 52);
+        sprintf(tmp, "BW:%.2f CR:%d", _node_prefs->bw, _node_prefs->cr);
+        _display->print(tmp);
+        break;
+      // remaining pages: Task 8
+      default:
+        break;
+    }
   }
 }
 
@@ -114,7 +168,7 @@ void UITask::loop() {
   int ev = user_btn.check();
   if (ev == BUTTON_EVENT_CLICK) {
     if (_display->isOn()) {
-      // TODO: any action ?
+      _page = (_page + 1) % PAGE_COUNT;
     } else {
       _display->turnOn();
     }

@@ -13,6 +13,17 @@ class UITask {
   unsigned long _powering_off_at = 0;
   unsigned long _started_at = 0;
 
+  enum Page {
+    PAGE_IDENTITY, PAGE_TRAFFIC, PAGE_SIGNAL, PAGE_SYSTEM,
+#if ENV_INCLUDE_GPS == 1
+    PAGE_GPS,
+#endif
+    PAGE_COUNT
+  };
+  uint8_t _page = PAGE_IDENTITY;
+
+  void drawHeader(const char* title);
+  void drawBreadcrumb();
   void renderCurrScreen();
 public:
   UITask(mesh::MainBoard& board, DisplayDriver& display) : _board(&board), _display(&display) { _next_read = _next_refresh = 0; }
