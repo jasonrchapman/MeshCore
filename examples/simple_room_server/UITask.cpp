@@ -139,7 +139,97 @@ void UITask::renderCurrScreen() {
         sprintf(tmp, "BW:%.2f CR:%d", _node_prefs->bw, _node_prefs->cr);
         _display->print(tmp);
         break;
-      // remaining pages: Task 11
+      case PAGE_MEMBERS:
+        drawHeader("MEMBERS");
+        drawBreadcrumb();
+        _display->setCursor(0, 16);
+        sprintf(tmp, "Registered: %d", the_mesh.getNumRegisteredClients());
+        _display->print(tmp);
+        _display->setCursor(0, 28);
+        sprintf(tmp, "Active today: %d", the_mesh.getNumActiveClients());
+        _display->print(tmp);
+        _display->setCursor(0, 40);
+        sprintf(tmp, "Guest pwd: %s", _node_prefs->guest_password[0] ? "set" : "none");
+        _display->print(tmp);
+        break;
+      case PAGE_STORAGE: {
+        drawHeader("STORAGE");
+        drawBreadcrumb();
+        _display->setCursor(0, 16);
+        sprintf(tmp, "Posts: %d/%d", the_mesh.getPostQueueOccupancy(), MAX_UNSYNCED_POSTS);
+        _display->print(tmp);
+        _display->setCursor(0, 28);
+        uint32_t age = the_mesh.getOldestQueuedPostAge();
+        if (age == 0) strcpy(tmp, "Oldest: none");
+        else formatAgo(tmp, "Oldest: ", age);
+        _display->print(tmp);
+#ifdef ESP32
+        _display->setCursor(0, 40);
+        sprintf(tmp, "Flash: %u/%uKB", (unsigned)(the_mesh.getCachedSpiffsUsedBytes() / 1024),
+                (unsigned)(SPIFFS.totalBytes() / 1024));
+        _display->print(tmp);
+#endif
+        break;
+      }
+      case PAGE_TRAFFIC: {
+        drawHeader("TRAFFIC");
+        drawBreadcrumb();
+        _display->setCursor(0, 16);
+        sprintf(tmp, "S f:%lu d:%lu", (unsigned long)the_mesh.getNumSentFlood(), (unsigned long)the_mesh.getNumSentDirect());
+        _display->print(tmp);
+        _display->setCursor(0, 28);
+        sprintf(tmp, "R f:%lu d:%lu", (unsigned long)the_mesh.getNumRecvFlood(), (unsigned long)the_mesh.getNumRecvDirect());
+        _display->print(tmp);
+        _display->setCursor(0, 40);
+        sprintf(tmp, "RSSI:%d SNR:%.1f", (int)radio_driver.getLastRSSI(), radio_driver.getLastSNR());
+        _display->print(tmp);
+        _display->setCursor(0, 52);
+        unsigned long air = the_mesh.getTotalAirTime() / 1000;
+        sprintf(tmp, "Air %02lu:%02lu:%02lu", air / 3600, (air % 3600) / 60, air % 60);
+        _display->print(tmp);
+        break;
+      }
+      case PAGE_SYSTEM: {
+        drawHeader("SYSTEM");
+        drawBreadcrumb();
+        _display->setCursor(0, 16);
+        unsigned long up = (millis() - _started_at) / 1000;
+        sprintf(tmp, "Up %lud %02lu:%02lu", up / 86400, (up % 86400) / 3600, (up % 3600) / 60);
+        _display->print(tmp);
+#ifdef ESP32
+        _display->setCursor(0, 28);
+        sprintf(tmp, "Heap: %lu KB", (unsigned long)(ESP.getFreeHeap() / 1024));
+        _display->print(tmp);
+#endif
+        _display->setCursor(0, 40);
+        _display->print(_version_info);
+        _display->setCursor(0, 52);
+        uint32_t la = the_mesh.getLastAdminActivity();  // since boot (not persisted)
+        if (la == 0) strcpy(tmp, "Admin: never");
+        else formatAgo(tmp, "Admin: ", the_mesh.getRTCClock()->getCurrentTime() - la);
+        _display->print(tmp);
+        break;
+      }
+#if ENV_INCLUDE_GPS == 1
+      case PAGE_GPS: {
+        drawHeader("GPS");
+        drawBreadcrumb();
+        LocationProvider* nmea = sensors.getLocationProvider();
+        _display->setCursor(0, 16);
+        if (nmea == NULL) {
+          _display->print("Can't access GPS");
+        } else if (!_node_prefs->gps_enabled) {
+          _display->print("GPS disabled");
+        } else {
+          sprintf(tmp, "fix:%s sat:%ld", nmea->isValid() ? "y" : "n", nmea->satellitesCount());
+          _display->print(tmp);
+          _display->setCursor(0, 28);
+          sprintf(tmp, "%.4f %.4f", nmea->getLatitude() / 1000000., nmea->getLongitude() / 1000000.);
+          _display->print(tmp);
+        }
+        break;
+      }
+#endif
       default:
         break;
     }
