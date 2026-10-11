@@ -195,6 +195,7 @@ public:
   int getNumRegisteredClients() { return acl.getNumRegistered(); }
   int getNumActiveClients() { return acl.getNumActiveClients(getRTCClock()->getCurrentTime(), 86400); }
   uint32_t getLastAdminActivity() { return acl.getLastAdminActivity(); }
+  uint32_t getUptimeSecs() const { return (uint32_t)(uptime_millis / 1000); }
 
   int getPostQueueOccupancy() const {
     int count = 0;
@@ -208,7 +209,12 @@ public:
       uint32_t t = posts[i].post_timestamp;
       if (t != 0 && (oldest == 0 || t < oldest)) oldest = t;
     }
-    return oldest == 0 ? 0 : getRTCClock()->getCurrentTime() - oldest;
+    if (oldest == 0) return 0;
+    uint32_t now = getRTCClock()->getCurrentTime();
+    if (now < oldest) return 0;
+    uint32_t age = now - oldest;
+    uint32_t up = getUptimeSecs();  // posts are RAM-only, so older than uptime is an RTC jump
+    return age > up ? up : age;
   }
 
 #ifdef ESP32
