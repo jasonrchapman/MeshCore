@@ -57,4 +57,7 @@ public:
 
   int getNumClients() const { return num_clients; }
   ClientInfo* getClientByIdx(int idx) { return &clients[idx]; }
+  int getNumRegistered() const;
+  int getNumActiveClients(uint32_t now, uint32_t within_secs) const;
+  uint32_t getLastAdminActivity() const;
 };
