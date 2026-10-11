@@ -192,6 +192,10 @@ public :
         nmea.getAltitude(alt);
         return alt;
     }
+    float getHDOP() override {
+      uint8_t h = nmea.getHDOP();
+      return h == 255 ? -1.0f : h / 10.0f;
+    }
     long satellitesCount() override { return nmea.getNumSatellites(); }
     bool isValid() override { return nmea.isValid(); }
 
