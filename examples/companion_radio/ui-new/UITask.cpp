@@ -7,6 +7,11 @@
   #include <WiFi.h>
 #endif
 
+// RTC values before this are the ESP32 boot seed (2024-05-15) plus uptime, not a real sync.
+#ifndef RTC_SANE_EPOCH
+  #define RTC_SANE_EPOCH 1767225600UL   // 2026-01-01 00:00:00 UTC
+#endif
+
 #ifndef AUTO_OFF_MILLIS
   #define AUTO_OFF_MILLIS     15000   // 15 seconds
 #endif
@@ -423,7 +428,9 @@ public:
       // until GPS or the app sets the time.
       uint32_t now = _rtc->getCurrentTime();
       char hhmm[8], date[16];
-      sprintf(hhmm, "%02lu:%02lu", (unsigned long)((now % 86400UL) / 3600), (unsigned long)((now % 3600UL) / 60));
+      bool clock_set = now >= RTC_SANE_EPOCH;
+      if (clock_set) sprintf(hhmm, "%02lu:%02lu", (unsigned long)((now % 86400UL) / 3600), (unsigned long)((now % 3600UL) / 60));
+      else strcpy(hhmm, "--:--");  // clock not set
       display.setColor(UIColor::primary_txt);
       display.setTextSize(3);
       int w = display.getTextWidth(hhmm);
@@ -433,18 +440,24 @@ public:
       display.print(hhmm);
       display.setTextSize(1);
 #else
-      char secs[4];
-      sprintf(secs, ":%02lu", (unsigned long)(now % 60));
-      int x = (display.width() - w - display.getTextWidth(":00") / 3) / 2;  // room for small seconds
+      // no seconds while the clock is unset, so center the bare HH:MM
+      int x = clock_set ? (display.width() - w - display.getTextWidth(":00") / 3) / 2  // room for small seconds
+                        : (display.width() - w) / 2;
       display.setCursor(x, 22);
       display.print(hhmm);
       display.setTextSize(1);
-      display.setCursor(x + w + 2, 36);
-      display.print(secs);
+      if (clock_set) {
+        char secs[4];
+        sprintf(secs, ":%02lu", (unsigned long)(now % 60));
+        display.setCursor(x + w + 2, 36);
+        display.print(secs);
+      }
 #endif
-      DateTime dt(now);
-      sprintf(date, "%02d %s %d", dt.day(), monthShortName(dt.month()), dt.year());
-      display.drawTextCentered(display.width() / 2, 54, date);
+      if (clock_set) {
+        DateTime dt(now);
+        sprintf(date, "%02d %s %d", dt.day(), monthShortName(dt.month()), dt.year());
+        display.drawTextCentered(display.width() / 2, 54, date);
+      }
 #if AUTO_OFF_MILLIS == 0  // probably e-ink: a full refresh every second blocks the loop and flickers
       return 60000;
 #else

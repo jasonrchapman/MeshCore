@@ -12,6 +12,11 @@ extern MyMesh the_mesh;
   #define BATT_MAX_MILLIVOLTS 4200
 #endif
 
+// RTC values before this are the ESP32 boot seed (2024-05-15) plus uptime, not a real sync.
+#ifndef RTC_SANE_EPOCH
+  #define RTC_SANE_EPOCH 1767225600UL   // 2026-01-01 00:00:00 UTC
+#endif
+
 // Same math as the companion's renderBatteryIndicator().
 static int battPercent(uint16_t mv) {
   int pct = ((int)mv - BATT_MIN_MILLIVOLTS) * 100 / (BATT_MAX_MILLIVOLTS - BATT_MIN_MILLIVOLTS);
@@ -110,7 +115,8 @@ void UITask::drawHeader(const char* title) {
   // UTC. Shows whatever the RTC holds; on ESP32 that is a fixed boot-time seed until
   // GPS or an admin `time` command sets it - same as the companion's clock today.
   uint32_t now = the_mesh.getRTCClock()->getCurrentTime();
-  sprintf(buf, "%02lu:%02lu", (unsigned long)((now % 86400UL) / 3600), (unsigned long)((now % 3600UL) / 60));
+  if (now < RTC_SANE_EPOCH) strcpy(buf, "--:--");  // clock not set
+  else sprintf(buf, "%02lu:%02lu", (unsigned long)((now % 86400UL) / 3600), (unsigned long)((now % 3600UL) / 60));
   _display->drawTextRightAlign(_display->width() - 1, 0, buf);
 }
 
