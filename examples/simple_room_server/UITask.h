@@ -9,6 +9,8 @@ class UITask {
   int _prevBtnState;
   NodePrefs* _node_prefs;
   char _version_info[32];
+  uint16_t _batt_mv = 0;
+  unsigned long _next_batt_read = 0;
   enum Page {
     PAGE_IDENTITY, PAGE_MEMBERS, PAGE_STORAGE, PAGE_TRAFFIC, PAGE_SYSTEM,
 #if ENV_INCLUDE_GPS == 1
