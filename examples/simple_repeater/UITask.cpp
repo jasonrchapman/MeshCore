@@ -26,6 +26,19 @@ static void formatAgo(char* buf, const char* label, uint32_t secs) {
   else                   sprintf(buf, "%s%lud", label, (unsigned long)(secs / 86400));
 }
 
+#if ENV_INCLUDE_GPS == 1
+// Same lookup as the companion's UITask::getGPSState(): the live "gps" sensor setting.
+static bool gpsActive() {
+  int num = sensors.getNumSettings();
+  for (int i = 0; i < num; i++) {
+    if (strcmp(sensors.getSettingName(i), "gps") == 0) {
+      return !strcmp(sensors.getSettingValue(i), "1");
+    }
+  }
+  return false;
+}
+#endif
+
 #ifndef USER_BTN_PRESSED
 #define USER_BTN_PRESSED LOW
 #endif
@@ -224,21 +237,58 @@ void UITask::renderCurrScreen() {
       case PAGE_GPS: {
         drawHeader("GPS");
         drawBreadcrumb();
+        // Mirrors the companion's GPS page (ui-new/UITask.cpp HomePage::GPS), display-only.
         LocationProvider* nmea = sensors.getLocationProvider();
-        _display->setCursor(0, 16);
-        if (nmea == NULL) {
-          _display->print("Can't access GPS");
-        } else if (!_node_prefs->gps_enabled) {
-          _display->print("GPS disabled");
+        int y = 18;
+        bool gps_state = gpsActive();
+#ifdef PIN_GPS_SWITCH
+        bool hw_gps_state = digitalRead(PIN_GPS_SWITCH);
+        if (gps_state != hw_gps_state) {
+          strcpy(tmp, gps_state ? "gps off(hw)" : "gps off(sw)");
         } else {
-          sprintf(tmp, "fix:%s sat:%ld", nmea->isValid() ? "y" : "n", nmea->satellitesCount());
-          _display->print(tmp);
-          _display->setCursor(0, 28);
+          strcpy(tmp, gps_state ? "gps on" : "gps off");
+        }
+#else
+        strcpy(tmp, gps_state ? "gps on" : "gps off");
+#endif
+        _display->setColor(UIColor::primary_txt);
+        _display->drawTextLeftAlign(0, y, tmp);
+        if (nmea == NULL) {
+          y = y + 12;
+          _display->setColor(UIColor::secondary_txt);
+          _display->drawTextLeftAlign(0, y, "Can't access GPS");
+        } else {
+          _display->setColor(UIColor::primary_txt);
+          strcpy(tmp, nmea->isValid() ? "fix" : "no fix");
+          _display->drawTextRightAlign(_display->width() - 1, y, tmp);
+          y = y + 12;
+          _display->setColor(UIColor::secondary_txt);
+          _display->drawTextLeftAlign(0, y, "sat");
+          float hdop = nmea->getHDOP();
+          if (nmea->isValid() && hdop > 0) {
+            // 10 segments, more filled = better accuracy (lower HDOP)
+            int filled = hdop <= 1.0f ? 10 : (int)(10.0f / hdop);
+            _display->setColor(UIColor::primary_txt);
+            for (int i = 0; i < 10; i++) {
+              if (i < filled) _display->fillRect(24 + i * 4, y, 3, 6);
+              else            _display->drawRect(24 + i * 4, y, 3, 6);
+            }
+          }
+          _display->setColor(UIColor::primary_txt);
+          sprintf(tmp, "%ld", nmea->satellitesCount());
+          _display->drawTextRightAlign(_display->width() - 1, y, tmp);
+          y = y + 12;
+          _display->setColor(UIColor::secondary_txt);
+          _display->drawTextLeftAlign(0, y, "pos");
+          _display->setColor(UIColor::primary_txt);
           sprintf(tmp, "%.4f %.4f", nmea->getLatitude() / 1000000., nmea->getLongitude() / 1000000.);
-          _display->print(tmp);
-          _display->setCursor(0, 40);
-          sprintf(tmp, "alt: %.1fm", nmea->getAltitude() / 1000.);
-          _display->print(tmp);
+          _display->drawTextRightAlign(_display->width() - 1, y, tmp);
+          y = y + 12;
+          _display->setColor(UIColor::secondary_txt);
+          _display->drawTextLeftAlign(0, y, "alt");
+          _display->setColor(UIColor::primary_txt);
+          sprintf(tmp, "%.2f", nmea->getAltitude() / 1000.);
+          _display->drawTextRightAlign(_display->width() - 1, y, tmp);
         }
         break;
       }
