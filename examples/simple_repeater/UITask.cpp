@@ -103,9 +103,12 @@ void UITask::drawHeader(const char* title) {
     _batt_mv = _board->getBattMilliVolts();
     _next_batt_read = millis() + 10000;
   }
-  sprintf(buf, "%d%%", battPercent(_batt_mv));
-  _display->setCursor(0, 0);
-  _display->print(buf);
+  // Battery icon, same geometry and fill math as the companion's renderBatteryIndicator(),
+  // drawn at the left so the title stays centered and the clock stays right.
+  int iconWidth = 24, iconHeight = 10, iconX = 0, iconY = 0;
+  _display->drawRect(iconX, iconY, iconWidth, iconHeight);
+  _display->fillRect(iconX + iconWidth, iconY + (iconHeight / 4), 3, iconHeight / 2);
+  _display->fillRect(iconX + 2, iconY + 2, (battPercent(_batt_mv) * (iconWidth - 4)) / 100, iconHeight - 4);
 
   _display->drawTextCentered(_display->width() / 2, 0, title);
 
@@ -169,14 +172,18 @@ void UITask::renderCurrScreen() {
       case PAGE_IDENTITY:
         drawHeader("IDENTITY");
         drawBreadcrumb();
-        _display->drawTextEllipsized(0, 16, _display->width(), _node_prefs->node_name);
+        {
+          char filtered_name[sizeof(_node_prefs->node_name)];  // same UTF-8 filter as the companion
+          _display->translateUTF8ToBlocks(filtered_name, _node_prefs->node_name, sizeof(filtered_name));
+          _display->drawTextEllipsized(0, 16, _display->width(), filtered_name);
+        }
         _display->setCursor(0, 28);
         _display->print("< Repeater >");
         _display->setCursor(0, 40);
-        sprintf(tmp, "F:%07.3f SF%d", _node_prefs->freq, _node_prefs->sf);
+        sprintf(tmp, "FREQ: %06.3f SF%d", _node_prefs->freq, _node_prefs->sf);  // upstream's format
         _display->print(tmp);
         _display->setCursor(0, 52);
-        sprintf(tmp, "BW:%.2f CR:%d", _node_prefs->bw, _node_prefs->cr);
+        sprintf(tmp, "BW: %03.2f CR: %d", _node_prefs->bw, _node_prefs->cr);
         _display->print(tmp);
         break;
       case PAGE_TRAFFIC: {
@@ -207,7 +214,7 @@ void UITask::renderCurrScreen() {
         sprintf(tmp, "SNR: %.1f dB", radio_driver.getLastSNR());
         _display->print(tmp);
         _display->setCursor(0, 40);
-        sprintf(tmp, "Noise: %d dBm", radio_driver.getNoiseFloor());
+        sprintf(tmp, "Noise floor: %d", radio_driver.getNoiseFloor());  // companion's label
         _display->print(tmp);
         _display->setCursor(0, 52);
         uint32_t lh = the_mesh.getLastHeardMillis();
