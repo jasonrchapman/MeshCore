@@ -156,7 +156,87 @@ void UITask::renderCurrScreen() {
         sprintf(tmp, "BW:%.2f CR:%d", _node_prefs->bw, _node_prefs->cr);
         _display->print(tmp);
         break;
-      // remaining pages: Task 8
+      case PAGE_TRAFFIC: {
+        drawHeader("TRAFFIC");
+        drawBreadcrumb();
+        _display->setCursor(0, 16);
+        sprintf(tmp, "S f:%lu d:%lu", (unsigned long)the_mesh.getNumSentFlood(), (unsigned long)the_mesh.getNumSentDirect());
+        _display->print(tmp);
+        _display->setCursor(0, 28);
+        sprintf(tmp, "R f:%lu d:%lu", (unsigned long)the_mesh.getNumRecvFlood(), (unsigned long)the_mesh.getNumRecvDirect());
+        _display->print(tmp);
+        _display->setCursor(0, 40);
+        unsigned long air = the_mesh.getTotalAirTime() / 1000;
+        sprintf(tmp, "Air %02lu:%02lu:%02lu", air / 3600, (air % 3600) / 60, air % 60);
+        _display->print(tmp);
+        _display->setCursor(0, 52);
+        sprintf(tmp, "TX budget: %u%%", the_mesh.getTxBudgetPercent());
+        _display->print(tmp);
+        break;
+      }
+      case PAGE_SIGNAL: {
+        drawHeader("SIGNAL");
+        drawBreadcrumb();
+        _display->setCursor(0, 16);
+        sprintf(tmp, "RSSI: %d dBm", (int)radio_driver.getLastRSSI());
+        _display->print(tmp);
+        _display->setCursor(0, 28);
+        sprintf(tmp, "SNR: %.1f dB", radio_driver.getLastSNR());
+        _display->print(tmp);
+        _display->setCursor(0, 40);
+        sprintf(tmp, "Noise: %d dBm", radio_driver.getNoiseFloor());
+        _display->print(tmp);
+        _display->setCursor(0, 52);
+        uint32_t lh = the_mesh.getLastHeardMillis();
+        if (lh == 0) strcpy(tmp, "Heard: never");
+        else formatAgo(tmp, "Heard: ", (millis() - lh) / 1000);
+        _display->print(tmp);
+        break;
+      }
+      case PAGE_SYSTEM: {
+        drawHeader("SYSTEM");
+        drawBreadcrumb();
+        _display->setCursor(0, 16);
+        unsigned long up = (millis() - _started_at) / 1000;
+        sprintf(tmp, "Up %lud %02lu:%02lu", up / 86400, (up % 86400) / 3600, (up % 3600) / 60);
+        _display->print(tmp);
+#ifdef ESP32
+        _display->setCursor(0, 28);
+        sprintf(tmp, "Heap: %lu KB", (unsigned long)(ESP.getFreeHeap() / 1024));
+        _display->print(tmp);
+#endif
+        _display->setCursor(0, 40);
+        _display->print(_version_info);
+        _display->setCursor(0, 52);
+        uint32_t la = the_mesh.getLastAdminActivity();  // since boot (not persisted)
+        if (la == 0) strcpy(tmp, "Admin: never");
+        else formatAgo(tmp, "Admin: ", the_mesh.getRTCClock()->getCurrentTime() - la);
+        _display->print(tmp);
+        break;
+      }
+#if ENV_INCLUDE_GPS == 1
+      case PAGE_GPS: {
+        drawHeader("GPS");
+        drawBreadcrumb();
+        LocationProvider* nmea = sensors.getLocationProvider();
+        _display->setCursor(0, 16);
+        if (nmea == NULL) {
+          _display->print("Can't access GPS");
+        } else if (!_node_prefs->gps_enabled) {
+          _display->print("GPS disabled");
+        } else {
+          sprintf(tmp, "fix:%s sat:%ld", nmea->isValid() ? "y" : "n", nmea->satellitesCount());
+          _display->print(tmp);
+          _display->setCursor(0, 28);
+          sprintf(tmp, "%.4f %.4f", nmea->getLatitude() / 1000000., nmea->getLongitude() / 1000000.);
+          _display->print(tmp);
+          _display->setCursor(0, 40);
+          sprintf(tmp, "alt: %.1fm", nmea->getAltitude() / 1000.);
+          _display->print(tmp);
+        }
+        break;
+      }
+#endif
       default:
         break;
     }
