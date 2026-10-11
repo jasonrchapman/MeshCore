@@ -321,22 +321,34 @@ public:
       // UTC. Same RTC the rest of this file reads; on ESP32 it holds a boot-time seed
       // until GPS or the app sets the time.
       uint32_t now = _rtc->getCurrentTime();
-      char hhmm[8], secs[4], date[16];
+      char hhmm[8], date[16];
       sprintf(hhmm, "%02lu:%02lu", (unsigned long)((now % 86400UL) / 3600), (unsigned long)((now % 3600UL) / 60));
-      sprintf(secs, ":%02lu", (unsigned long)(now % 60));
       display.setColor(UIColor::primary_txt);
       display.setTextSize(3);
       int w = display.getTextWidth(hhmm);
+#if AUTO_OFF_MILLIS == 0  // probably e-ink: no seconds, so the frame only changes once a minute
+      int x = (display.width() - w) / 2;
+      display.setCursor(x, 22);
+      display.print(hhmm);
+      display.setTextSize(1);
+#else
+      char secs[4];
+      sprintf(secs, ":%02lu", (unsigned long)(now % 60));
       int x = (display.width() - w - display.getTextWidth(":00") / 3) / 2;  // room for small seconds
       display.setCursor(x, 22);
       display.print(hhmm);
       display.setTextSize(1);
       display.setCursor(x + w + 2, 36);
       display.print(secs);
+#endif
       DateTime dt(now);
       sprintf(date, "%02d %s %d", dt.day(), monthShortName(dt.month()), dt.year());
       display.drawTextCentered(display.width() / 2, 54, date);
+#if AUTO_OFF_MILLIS == 0  // probably e-ink: a full refresh every second blocks the loop and flickers
+      return 60000;
+#else
       return 1000;  // HomeScreen normally re-renders every 5000ms; the clock needs 1s
+#endif
 #if ENV_INCLUDE_GPS == 1
     } else if (_page == HomePage::GPS) {
       LocationProvider* nmea = sensors.getLocationProvider();
