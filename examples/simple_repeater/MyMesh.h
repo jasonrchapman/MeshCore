@@ -33,6 +33,7 @@
 #include <helpers/StaticPoolPacketManager.h>
 #include <helpers/StatsFormatHelper.h>
 #include <helpers/TxtDataHelpers.h>
+#include <helpers/ui/TxBudgetFormat.h>
 #include <helpers/RegionMap.h>
 #include <helpers/RoutingPolicy.h>
 #include "RateLimiter.h"
@@ -90,6 +91,7 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   bool _logging;
   NodePrefs _prefs;
   ClientACL  acl;
+  uint32_t _last_heard_ms = 0;  // millis() of last received packet - no I/O in the radio path
   CommonCLI _cli;
   uint8_t reply_data[MAX_PACKET_PAYLOAD];
   uint8_t reply_path[MAX_PATH_SIZE];
@@ -190,6 +192,14 @@ public:
   const char* getNodeName() { return _prefs.node_name; }
   NodePrefs* getNodePrefs() {
     return &_prefs;
+  }
+
+  uint32_t getLastHeardMillis() const { return _last_heard_ms; }
+  uint32_t getLastAdminActivity() { return acl.getLastAdminActivity(); }
+  uint8_t getTxBudgetPercent() {
+    // same max-budget formula Dispatcher.cpp uses when it refills tx_budget_ms
+    unsigned long max_budget = (unsigned long)(getDutyCycleWindowMs() * (1.0f / (1.0f + getAirtimeBudgetFactor())));
+    return txBudgetPercent(getRemainingTxBudget(), max_budget);
   }
 
   void savePrefs() override {
