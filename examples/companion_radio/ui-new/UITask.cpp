@@ -392,7 +392,7 @@ public:
         display.setColor(UIColor::secondary_txt);
         display.drawTextLeftAlign(0, y, "sat");
         float hdop = nmea->getHDOP();
-        if (hdop >= 0) {
+        if (nmea->isValid() && hdop > 0) {
           // 10 segments, more filled = better accuracy (lower HDOP)
           int filled = hdop <= 1.0f ? 10 : (int)(10.0f / hdop);
           display.setColor(UIColor::primary_txt);
