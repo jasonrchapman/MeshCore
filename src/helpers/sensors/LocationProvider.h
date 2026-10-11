@@ -13,6 +13,7 @@ public:
     virtual long getLatitude() = 0;
     virtual long getLongitude() = 0;
     virtual long getAltitude() = 0;
+    virtual float getHDOP() { return -1.0f; }  // -1 == unknown / not supported
     virtual long satellitesCount() = 0;
     virtual bool isValid() = 0;
     virtual long getTimestamp() = 0;
