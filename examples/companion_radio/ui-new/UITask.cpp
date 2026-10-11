@@ -40,6 +40,21 @@
 const char* getCachedBleMacStr();  // src/helpers/esp32/SerialBLEInterface.cpp
 #endif
 
+// On BLE+USB builds the USB interface always reports connected (it can't detect a host),
+// which would hide the pairing PIN forever, so the home screen's PIN / "< Connected >"
+// line follows Bluetooth's own state there. Every other build keeps hasConnection().
+#if defined(BLE_PIN_CODE) && defined(ENABLE_USB_INTERFACE)
+  #ifdef ESP32
+    #include <helpers/esp32/SerialBLEInterface.h>
+  #elif defined(NRF52_PLATFORM)
+    #include <helpers/nrf52/SerialBLEInterface.h>
+  #endif
+extern SerialBLEInterface bluetooth_interface;  // examples/companion_radio/main.cpp
+static bool pairingLinkConnected(UITask*) { return bluetooth_interface.isConnected(); }
+#else
+static bool pairingLinkConnected(UITask* task) { return task->hasConnection(); }
+#endif
+
 static const char* monthShortName(int m) {
   static const char* names[] = {"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
   return (m >= 1 && m <= 12) ? names[m - 1] : "???";
@@ -105,13 +120,13 @@ class HomeScreen : public UIScreen {
     RADIO,
     BLUETOOTH,
     ADVERT,
-    CLOCK,
 #if ENV_INCLUDE_GPS == 1
     GPS,
 #endif
 #if UI_SENSORS_PAGE == 1
     SENSORS,
 #endif
+    CLOCK,     // added after all the upstream pages so their order is unchanged
     SHUTDOWN,
     Count    // keep as last
   };
@@ -237,7 +252,7 @@ public:
     if (_page == HomePage::FIRST) {
       display.setColor(UIColor::primary_txt);
 #if defined(MESHCORE_DUALBOOT) && defined(BLE_PIN_CODE)
-      if (!_task->hasConnection() && the_mesh.getBLEPin() != 0) {
+      if (!pairingLinkConnected(_task) && the_mesh.getBLEPin() != 0) {
         display.setTextSize(1);
         display.drawTextCentered(display.width() / 2, 26, getCachedBleMacStr());  // 17 chars
       } else
@@ -254,7 +269,7 @@ public:
         display.setTextSize(1);
         display.drawTextCentered(display.width() / 2, 54, tmp);
       #endif
-      if (_task->hasConnection()) {
+      if (pairingLinkConnected(_task)) {
         display.setColor(UIColor::warning_txt);
         display.setTextSize(1);
         display.drawTextCentered(display.width() / 2, 43, "< Connected >");
