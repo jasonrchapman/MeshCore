@@ -2,6 +2,7 @@
 #include "target.h"
 #include <Arduino.h>
 #include <helpers/CommonCLI.h>
+#include <helpers/LocalTime.h>
 #include "MyMesh.h"
 extern MyMesh the_mesh;
 
@@ -16,6 +17,15 @@ extern MyMesh the_mesh;
 #ifndef RTC_SANE_EPOCH
   #define RTC_SANE_EPOCH 1767225600UL   // 2026-01-01 00:00:00 UTC
 #endif
+
+// Display-only local time from the GPS position (see LocalTime.h). The RTC stays UTC.
+static LocalTime local_time;
+static uint32_t localNow(uint32_t utc) {
+  LocationProvider* gps = sensors.getLocationProvider();
+  bool fix = gps && gps->isValid();
+  local_time.update(utc, fix, fix ? gps->getLatitude() : 0, fix ? gps->getLongitude() : 0);
+  return local_time.toLocal(utc);
+}
 
 // Same math as the companion's renderBatteryIndicator().
 static int battPercent(uint16_t mv) {
@@ -95,7 +105,7 @@ void UITask::begin(NodePrefs* node_prefs, const char* build_date, const char* fi
 }
 
 void UITask::drawHeader(const char* title) {
-  char buf[8];
+  char buf[12];
   _display->setTextSize(1);
   _display->setColor(UIColor::primary_txt);
 
@@ -112,11 +122,15 @@ void UITask::drawHeader(const char* title) {
 
   _display->drawTextCentered(_display->width() / 2, 0, title);
 
-  // UTC. Shows whatever the RTC holds; on ESP32 that is a fixed boot-time seed until
-  // GPS or an admin `time` command sets it - same as the companion's clock today.
+  // Local time for the GPS position; "Z" marks UTC when there is no zone. The RTC holds UTC;
+  // on ESP32 that is a fixed boot-time seed until GPS or an admin `time` command sets it.
   uint32_t now = the_mesh.getRTCClock()->getCurrentTime();
   if (now < RTC_SANE_EPOCH) strcpy(buf, "--:--");  // clock not set
-  else sprintf(buf, "%02lu:%02lu", (unsigned long)((now % 86400UL) / 3600), (unsigned long)((now % 3600UL) / 60));
+  else {
+    now = localNow(now);
+    sprintf(buf, "%02lu:%02lu%s", (unsigned long)((now % 86400UL) / 3600), (unsigned long)((now % 3600UL) / 60),
+            strcmp(local_time.zoneName(), "UTC") == 0 ? "Z" : "");
+  }
   _display->drawTextRightAlign(_display->width() - 1, 0, buf);
 }
 
@@ -272,7 +286,8 @@ void UITask::renderCurrScreen() {
           _display->drawTextLeftAlign(0, y, "Can't access GPS");
         } else {
           _display->setColor(UIColor::primary_txt);
-          strcpy(tmp, nmea->isValid() ? "fix" : "no fix");
+          if (nmea->isValid()) sprintf(tmp, "fix %s", local_time.zoneName());  // zone the clock uses
+          else strcpy(tmp, "no fix");
           _display->drawTextRightAlign(_display->width() - 1, y, tmp);
           y = y + 12;
           _display->setColor(UIColor::secondary_txt);
