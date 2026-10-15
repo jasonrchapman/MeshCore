@@ -1,5 +1,6 @@
 #include "UITask.h"
 #include <helpers/TxtDataHelpers.h>
+#include <helpers/LocalTime.h>
 #include "../MyMesh.h"
 #include "target.h"
 #include <time.h>
@@ -56,6 +57,15 @@ static bool pairingLinkConnected(UITask*) { return bluetooth_interface.isConnect
 #else
 static bool pairingLinkConnected(UITask* task) { return task->hasConnection(); }
 #endif
+
+// Display-only local time from the GPS position (see LocalTime.h). The RTC stays UTC.
+static LocalTime local_time;
+static uint32_t localNow(uint32_t utc) {
+  LocationProvider* gps = sensors.getLocationProvider();
+  bool fix = gps && gps->isValid();
+  local_time.update(utc, fix, fix ? gps->getLatitude() : 0, fix ? gps->getLongitude() : 0);
+  return local_time.toLocal(utc);
+}
 
 static const char* monthShortName(int m) {
   static const char* names[] = {"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
@@ -424,11 +434,12 @@ public:
       display.setColor(UIColor::secondary_txt);
       display.drawTextCentered(display.width() / 2, 64 - 11, "advert: " PRESS_LABEL);
     } else if (_page == HomePage::CLOCK) {
-      // UTC. Same RTC the rest of this file reads; on ESP32 it holds a boot-time seed
-      // until GPS or the app sets the time.
+      // Local time for the GPS position, or UTC (labeled) without one. The RTC holds UTC; on
+      // ESP32 it holds a boot-time seed until GPS or the app sets the time.
       uint32_t now = _rtc->getCurrentTime();
-      char hhmm[8], date[16];
+      char hhmm[8], date[24];
       bool clock_set = now >= RTC_SANE_EPOCH;
+      if (clock_set) now = localNow(now);
       if (clock_set) sprintf(hhmm, "%02lu:%02lu", (unsigned long)((now % 86400UL) / 3600), (unsigned long)((now % 3600UL) / 60));
       else strcpy(hhmm, "--:--");  // clock not set
       display.setColor(UIColor::primary_txt);
@@ -455,7 +466,7 @@ public:
 #endif
       if (clock_set) {
         DateTime dt(now);
-        sprintf(date, "%02d %s %d", dt.day(), monthShortName(dt.month()), dt.year());
+        sprintf(date, "%02d %s %d %s", dt.day(), monthShortName(dt.month()), dt.year(), local_time.zoneName());
         display.drawTextCentered(display.width() / 2, 54, date);
       }
 #if AUTO_OFF_MILLIS == 0  // probably e-ink: a full refresh every second blocks the loop and flickers
