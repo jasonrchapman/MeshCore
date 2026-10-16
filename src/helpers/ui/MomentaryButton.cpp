@@ -1,6 +1,7 @@
 #include "MomentaryButton.h"
 
 #define MULTI_CLICK_WINDOW_MS  280
+#define DEBOUNCE_MS            25   // a level change counts only once it holds this long
 
 MomentaryButton::MomentaryButton(int8_t pin, int long_press_millis, bool reverse, bool pulldownup, bool multiclick) { 
   _pin = pin;
@@ -15,6 +16,8 @@ MomentaryButton::MomentaryButton(int8_t pin, int long_press_millis, bool reverse
   _last_click_time = 0;
   _multi_click_window = multiclick ? MULTI_CLICK_WINDOW_MS : 0;
   _pending_click = false;
+  _raw = prev;
+  _raw_changed_at = 0;
 }
 
 MomentaryButton::MomentaryButton(int8_t pin, int long_press_millis, int analog_threshold) {
@@ -30,6 +33,8 @@ MomentaryButton::MomentaryButton(int8_t pin, int long_press_millis, int analog_t
   _last_click_time = 0;
   _multi_click_window = MULTI_CLICK_WINDOW_MS;
   _pending_click = false;
+  _raw = prev;
+  _raw_changed_at = 0;
 }
 
 void MomentaryButton::begin() {
@@ -66,7 +71,13 @@ int MomentaryButton::check(bool repeat_click) {
   if (_pin < 0) return BUTTON_EVENT_NONE;
 
   int event = BUTTON_EVENT_NONE;
-  int btn = _threshold > 0 ? (analogRead(_pin) < _threshold) : digitalRead(_pin);
+  int raw = _threshold > 0 ? (analogRead(_pin) < _threshold) : digitalRead(_pin);
+  if (raw != _raw) {
+    _raw = raw;
+    _raw_changed_at = millis();
+  }
+  // contact chatter: keep the previous level until the new one has been steady for DEBOUNCE_MS
+  int btn = (unsigned long)(millis() - _raw_changed_at) >= DEBOUNCE_MS ? _raw : prev;
   if (btn != prev) {
     if (isPressed(btn)) {
       down_at = millis();
