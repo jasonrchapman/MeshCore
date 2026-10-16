@@ -19,6 +19,8 @@ class MomentaryButton {
   unsigned long _last_click_time;
   int _multi_click_window;
   bool _pending_click;
+  int8_t _raw;                     // last level read, before debouncing
+  unsigned long _raw_changed_at;   // when _raw last changed
 
   bool isPressed(int level) const;
 
