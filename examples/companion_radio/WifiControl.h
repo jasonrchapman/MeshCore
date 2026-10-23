@@ -11,6 +11,7 @@ bool wifiIsOn();              // ESP32: trying or joined now. Other chips: saved
 bool wifiIsConnected();       // joined, so the IP address is real
 bool wifiCanApplyLive();      // false where the change needs a reboot (non-ESP32)
 void wifiSetEnabled(bool on); // save wifi.enabled, then start or stop WiFi where possible
+void wifiControlLoop();       // our addition: settings checks, called from wifiLinkLoop()
 
 // The three text lines of the WiFi page (layout A), each at most n - 1 characters.
 void wifiPageLines(char* l1, char* l2, char* l3, size_t n);

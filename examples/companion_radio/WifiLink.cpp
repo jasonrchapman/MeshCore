@@ -13,6 +13,8 @@ extern bool wifi_enabled;
 extern char wifi_ssid[33];
 extern char wifi_pwd[64];
 
+void wifiControlLoop();   // WifiControl.cpp; no include, because it includes WifiLink.h
+
 static WifiRetry wl_retry;
 static bool wl_init = false;
 static bool wl_boot_started = false;
@@ -112,6 +114,7 @@ void wifiLinkLoop() {
 #ifdef OURS_LOOP_PROBE
   probe(now);
 #endif
+  wifiControlLoop();
 }
 
 void wifiLinkStart() {
