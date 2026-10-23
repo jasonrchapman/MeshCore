@@ -12,7 +12,8 @@
 //   ESP32-S3  Heltec V3 1.94 MB free, Heltec V4 4.4 MB
 // Every other chip family builds without it, and its screen clocks show UTC. If a board in these
 // families ever overflows flash, the link fails, so the image never ships broken.
-#if defined(NRF52840_XXAA) || defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32S3)
+// LOCALTIME_HOST_TEST turns the grid on for the host unit tests in test/test_ours_localtime.
+#if defined(NRF52840_XXAA) || defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32S3) || defined(LOCALTIME_HOST_TEST)
   #define LOCALTIME_GRID 1
   #include "TimeZoneGrid.h"
 #endif
