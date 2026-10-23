@@ -37,19 +37,23 @@ static_assert(RTC_TIME_MIN < LOCALTIME_BUILD_EPOCH, "upstream's start time must 
 #endif
 
 #include "icons.h"
+#include "../WifiControl.h"
 
 #if defined(ESP32) && defined(BLE_PIN_CODE)
 const char* getCachedBleMacStr();  // src/helpers/esp32/SerialBLEInterface.cpp
 #endif
 
-// On BLE+USB builds the USB interface always reports connected (it can't detect a host),
-// which would hide the pairing PIN forever, so the home screen's PIN / "< Connected >"
-// line follows Bluetooth's own state there. Every other build keeps hasConnection().
-#if defined(BLE_PIN_CODE) && defined(ENABLE_USB_INTERFACE)
+// On builds with Bluetooth plus another interface, the other one can report "connected" while no
+// phone is paired: USB always does, and a WiFi client does too. The home screen's PIN /
+// "< Connected >" line therefore follows Bluetooth's own state there. Every other build keeps
+// hasConnection().
+#if defined(BLE_PIN_CODE) && (defined(ENABLE_USB_INTERFACE) || defined(ENABLE_WIFI_INTERFACE))
   #ifdef ESP32
     #include <helpers/esp32/SerialBLEInterface.h>
   #elif defined(NRF52_PLATFORM)
     #include <helpers/nrf52/SerialBLEInterface.h>
+  #elif defined(RP2040_PLATFORM)
+    #include <helpers/rp2040/SerialBLEInterface.h>
   #endif
 extern SerialBLEInterface bluetooth_interface;  // examples/companion_radio/main.cpp
 static bool pairingLinkConnected(UITask*) { return bluetooth_interface.isConnected(); }
@@ -131,6 +135,9 @@ class HomeScreen : public UIScreen {
     RECENT,
     RADIO,
     BLUETOOTH,
+#ifdef ENABLE_WIFI_INTERFACE
+    WIFI,      // our addition, beside the Bluetooth page
+#endif
     ADVERT,
 #if ENV_INCLUDE_GPS == 1
     GPS,
@@ -321,19 +328,30 @@ public:
 
     if (_page == HomePage::FIRST) {
       display.setColor(UIColor::primary_txt);
+#if defined(ESP32) && defined(BLE_PIN_CODE)
+      // our addition: while a phone can pair, the BLE MAC takes the unread-message line
+      bool show_mac = !pairingLinkConnected(_task) && the_mesh.getBLEPin() != 0;
+#endif
       #ifdef ENABLE_WIFI_INTERFACE
       // smaller unread message ui for wifi variants
       display.setTextSize(1);
-      sprintf(tmp, "Unread Msg: %d", _task->getMsgCount());
-      display.drawTextCentered(display.width() / 2, 22, tmp);
+  #if defined(ESP32) && defined(BLE_PIN_CODE)
+      if (show_mac) {
+        display.drawTextCentered(display.width() / 2, 22, getCachedBleMacStr());  // 17 chars
+      } else
+  #endif
+      {
+        sprintf(tmp, "Unread Msg: %d", _task->getMsgCount());
+        display.drawTextCentered(display.width() / 2, 22, tmp);
+      }
       #else
       // larger unread message ui for non wifi variants
-#if defined(ESP32) && defined(BLE_PIN_CODE)
-      if (!pairingLinkConnected(_task) && the_mesh.getBLEPin() != 0) {
+  #if defined(ESP32) && defined(BLE_PIN_CODE)
+      if (show_mac) {
         display.setTextSize(1);
         display.drawTextCentered(display.width() / 2, 26, getCachedBleMacStr());  // 17 chars
       } else
-#endif
+  #endif
       {
         display.setTextSize(2);
         sprintf(tmp, "MSG: %d", _task->getMsgCount());
@@ -352,10 +370,12 @@ public:
       display.drawTextCentered(display.width() / 2, 80, tmp);
       #endif
       #ifdef ENABLE_WIFI_INTERFACE
+      if (wifiIsConnected()) {   // our addition: no "IP: 0.0.0.0" while WiFi is off or joining
         IPAddress ip = WiFi.localIP();
         snprintf(tmp, sizeof(tmp), "IP: %d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
         display.setTextSize(1);
         display.drawTextCentered(display.width() / 2, 32, tmp);
+      }
       #endif
       if (pairingLinkConnected(_task)) {
         display.setColor(UIColor::warning_txt);
@@ -428,6 +448,32 @@ public:
       display.setColor(UIColor::secondary_txt);
       display.setTextSize(1);
       display.drawTextCentered(display.width() / 2, 64 - 11, "toggle: " PRESS_LABEL);
+#ifdef ENABLE_WIFI_INTERFACE
+    } else if (_page == HomePage::WIFI) {   // our addition: layout A, approved 2026-10-22
+      display.setColor(UIColor::corp_blue);
+      if (!wifiHasSsid()) {
+        display.drawXbm((display.width() - 32) / 2, 18, wifi_off_icon, 32, 32);
+        display.setColor(UIColor::secondary_txt);
+        display.setTextSize(1);
+        display.drawTextCentered(display.width() / 2, 64 - 11, "No SSID set");
+      } else {
+        char l1[34], l2[24], l3[24];
+        wifiPageLines(l1, l2, l3, sizeof(l2));
+        display.drawXbm(0, 18, wifiIsOn() ? wifi_on_icon : wifi_off_icon, 32, 32);
+        display.setColor(UIColor::primary_txt);
+        display.setTextSize(1);
+        display.drawTextEllipsized(33, 20, display.width() - 33, l1);
+        display.drawTextLeftAlign(33, 31, l2);
+        display.drawTextLeftAlign(33, 42, l3);
+        display.setColor(UIColor::secondary_txt);
+        display.drawTextCentered(display.width() / 2, 64 - 11, wifiGaveUp() ? "retry: " PRESS_LABEL : "toggle: " PRESS_LABEL);
+      }
+#if AUTO_OFF_MILLIS == 0  // probably e-ink: keep the home page's 5 s rate
+      return 5000;
+#else
+      return 1000;  // the next-try countdown and the IP need 1 s, like upstream's message screen
+#endif
+#endif
     } else if (_page == HomePage::ADVERT) {
       display.setColor(UIColor::corp_blue);
       display.drawXbm((display.width() - 32) / 2, 18, advert_icon, 32, 32);
@@ -682,6 +728,16 @@ public:
       }
       return true;
     }
+#ifdef ENABLE_WIFI_INTERFACE
+    if (c == KEY_ENTER && _page == HomePage::WIFI) {
+      if (wifiHasSsid()) {
+        bool on = !wifiIsOn();
+        wifiSetEnabled(on);
+        _task->showAlert(wifiCanApplyLive() ? (on ? "WiFi on" : "WiFi off") : "Reboot to apply", 1000);
+      }
+      return true;
+    }
+#endif
     if (c == KEY_ENTER && _page == HomePage::ADVERT) {
       _task->notify(UIEventType::ack);
       if (the_mesh.advert()) {
