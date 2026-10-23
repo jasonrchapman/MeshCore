@@ -86,6 +86,22 @@ TEST(WifiToggle, SignalWords) {
   EXPECT_STREQ(wifiSignalWord(-76), "weak");
 }
 
+TEST(WifiPair, BothChangedRestarts) {
+  EXPECT_TRUE(wifiPairChanged("NewNet", "newpass", "OldNet", "oldpass"));
+}
+TEST(WifiPair, OnlySsidChangedWaits) {
+  EXPECT_FALSE(wifiPairChanged("NewNet", "samepass", "OldNet", "samepass"));
+}
+TEST(WifiPair, OnlyPasswordChangedWaits) {
+  EXPECT_FALSE(wifiPairChanged("SameNet", "newpass", "SameNet", "oldpass"));
+}
+TEST(WifiPair, NothingChangedWaits) {
+  EXPECT_FALSE(wifiPairChanged("SameNet", "samepass", "SameNet", "samepass"));
+}
+TEST(WifiPair, ClearedNetworkIsNotThisRule) {   // fix E handles a cleared network
+  EXPECT_FALSE(wifiPairChanged("", "", "OldNet", "oldpass"));
+}
+
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

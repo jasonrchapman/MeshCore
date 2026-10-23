@@ -1,7 +1,15 @@
 #pragma once
+#include <string.h>
 
 // Signal word for the WiFi page: good from -67 dBm up, fair from -75 to -68 dBm, weak below.
 inline const char* wifiSignalWord(int rssi) { return rssi >= -67 ? "good" : rssi >= -75 ? "fair" : "weak"; }
+
+// True when the saved network and password BOTH differ from the running pair (user rule, 2026-10-23).
+// A one-sided change waits for a reboot or a page off and on, because it can be the first of the
+// app's two commands (set wifi.ssid, set wifi.pwd). An empty saved SSID is the cleared case, not this.
+inline bool wifiPairChanged(const char* saved_ssid, const char* saved_pwd, const char* run_ssid, const char* run_pwd) {
+  return saved_ssid[0] != 0 && strcmp(saved_ssid, run_ssid) != 0 && strcmp(saved_pwd, run_pwd) != 0;
+}
 
 // Companion WiFi page logic (our addition). No Arduino or WiFi code here, so the host tests in
 // test/test_ours_wifi_toggle can drive it. WifiControl.cpp supplies the real steps.

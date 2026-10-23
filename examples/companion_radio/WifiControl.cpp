@@ -116,6 +116,10 @@ void wifiSetEnabled(bool on) {
 void wifiControlLoop() {
   // the user's 2026-10-23 rule: if the saved network is cleared, WiFi turns off
   if (liveRunning() && the_mesh.getNodePrefs()->getWifiSSID()[0] == 0) wifiSetEnabled(true);
+  NodePrefs* p = the_mesh.getNodePrefs();
+  if (liveRunning() && wifiPairChanged(p->getWifiSSID(), p->wifi_ssid[0] ? p->wifi_pwd : WIFI_PWD, wifi_ssid, wifi_pwd)) {
+    wifiSetEnabled(true);   // both settings changed: restart with the saved pair (re-read in loadSsid)
+  }
 }
 
 void wifiPageLines(char* l1, char* l2, char* l3, size_t n) {
