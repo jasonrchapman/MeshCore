@@ -12,7 +12,7 @@ public:
   struct Ops {
     virtual void savePref(bool on) = 0;  // NodePrefs::wifi_enabled, then savePrefs()
     virtual bool loadSsid() = 0;         // re-read the saved SSID and password; false if none
-    virtual void serverBegin() = 0;      // wifi_interface.begin(TCP_PORT), once per boot
+    virtual void serverBegin() = 0;      // wifi_interface.begin(TCP_PORT), once per boot; after linkStart(): the ESP32 TCP/IP stack starts in WiFi.begin()
     virtual void attach() = 0;           // addInterface(), enable()
     virtual void detach() = 0;           // stopClient(), disable(), removeInterface()
     virtual void linkStart() = 0;        // WifiRetry::start(): radio on, first try
@@ -39,11 +39,12 @@ public:
       }
       if (running) {
         ops.linkStop();        // start again with the settings just read
+        ops.linkStart();
       } else {
+        ops.linkStart();       // radio first, because on ESP32 the TCP/IP stack only exists after WiFi.begin()
         if (!_server_up) { ops.serverBegin(); _server_up = true; }
         ops.attach();
       }
-      ops.linkStart();
       return true;
     }
     if (running) { ops.linkStop(); ops.detach(); }

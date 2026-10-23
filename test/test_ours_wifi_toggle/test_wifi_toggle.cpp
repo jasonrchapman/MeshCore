@@ -19,7 +19,7 @@ TEST(WifiToggle, OffAtBootThenOnStartsServerOnce) {
   WifiToggle t; FakeOps ops;
   t.noteBoot(false);
   EXPECT_TRUE(t.set(true, false, true, ops));
-  EXPECT_EQ(ops.log, "save1 load server attach start ");
+  EXPECT_EQ(ops.log, "save1 load start server attach ");
 }
 
 TEST(WifiToggle, OnAtBootThenOffThenOnReusesServer) {
@@ -27,7 +27,7 @@ TEST(WifiToggle, OnAtBootThenOffThenOnReusesServer) {
   t.noteBoot(true);
   EXPECT_FALSE(t.set(false, true, true, ops));
   EXPECT_TRUE(t.set(true, false, true, ops));
-  EXPECT_EQ(ops.log, "save0 stop detach save1 load attach start ");
+  EXPECT_EQ(ops.log, "save0 stop detach save1 load start attach ");
 }
 
 TEST(WifiToggle, RepeatedCyclesStartServerOnlyOnce) {
@@ -36,7 +36,7 @@ TEST(WifiToggle, RepeatedCyclesStartServerOnlyOnce) {
   t.set(true, false, true, ops);
   t.set(false, true, true, ops);
   t.set(true, false, true, ops);
-  EXPECT_EQ(ops.log, "save1 load server attach start save0 stop detach save1 load attach start ");
+  EXPECT_EQ(ops.log, "save1 load start server attach save0 stop detach save1 load start attach ");
 }
 
 TEST(WifiToggle, NoSavedNetworkStaysOff) {
@@ -75,7 +75,7 @@ TEST(WifiToggle, OnlyTheFirstNoteBootCounts) {
   t.noteBoot(false);
   t.set(false, true, true, ops);
   t.set(true, false, true, ops);
-  EXPECT_EQ(ops.log, "save0 stop detach save1 load attach start ");
+  EXPECT_EQ(ops.log, "save0 stop detach save1 load start attach ");
 }
 
 TEST(WifiToggle, SignalWords) {
