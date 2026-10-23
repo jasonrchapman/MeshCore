@@ -145,6 +145,7 @@ void wifiPageLines(char* l1, char* l2, char* l3, size_t n) {
     snprintf(l2, n, "%s", WIFI_TXT_TRYING);
     snprintf(l3, n, "next try %lus", (unsigned long)wifiLinkSecondsToNextTry());
   } else if (s == WifiRetry::GAVE_UP) {
+    snprintf(l1, n, "%s", wifi_ssid);   // the reason below belongs to the network that was tried (user rule, 2026-10-23)
     snprintf(l2, n, "%s", wifiLinkReason() == WifiRetry::WRONG_PASSWORD ? "Wrong password" : "No network");
     snprintf(l3, n, "%s", WIFI_TXT_GAVE_UP);
   } else
