@@ -113,17 +113,24 @@ void wifiSetEnabled(bool on) {
   wc_toggle.set(on, liveRunning(), wifiCanApplyLive(), ops);
 }
 
+static void wifiReapply() {   // settings changed: apply them, never save the on/off choice
+  noteBootState();
+  WifiOps ops;
+  wc_toggle.reapply(liveRunning(), wifiCanApplyLive(), ops);
+}
+
 void wifiControlLoop() {
-  // the user's 2026-10-23 rule: if the saved network is cleared, WiFi turns off
-  if (liveRunning() && the_mesh.getNodePrefs()->getWifiSSID()[0] == 0) wifiSetEnabled(true);
+  // the user's 2026-10-23 rule: if the saved network is cleared, WiFi stops (nothing is saved)
+  if (liveRunning() && the_mesh.getNodePrefs()->getWifiSSID()[0] == 0) wifiReapply();
   NodePrefs* p = the_mesh.getNodePrefs();
   if (liveRunning() && wifiPairChanged(p->getWifiSSID(), p->wifi_ssid[0] ? p->wifi_pwd : WIFI_PWD, wifi_ssid, wifi_pwd)) {
-    wifiSetEnabled(true);   // both settings changed: restart with the saved pair (re-read in loadSsid)
+    wifiReapply();   // both settings changed: restart with the saved pair (re-read in loadSsid)
   }
 }
 
 void wifiPageLines(char* l1, char* l2, char* l3, size_t n) {
-  snprintf(l1, n, "%s", the_mesh.getNodePrefs()->getWifiSSID());
+  // the network in use while WiFi runs, else the saved one the next start uses (user rule, 2026-10-23)
+  snprintf(l1, n, "%s", liveRunning() ? wifi_ssid : the_mesh.getNodePrefs()->getWifiSSID());
   l2[0] = l3[0] = 0;
 #if defined(ESP32)
   WifiRetry::State s = wifiLinkState();

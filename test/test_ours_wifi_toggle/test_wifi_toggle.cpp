@@ -86,6 +86,28 @@ TEST(WifiToggle, SignalWords) {
   EXPECT_STREQ(wifiSignalWord(-76), "weak");
 }
 
+TEST(WifiToggle, ReapplyNeverSaves) {   // user rule 2026-10-23: settings changes never save "enabled"
+  WifiToggle t; FakeOps ops;
+  t.noteBoot(true);
+  EXPECT_TRUE(t.reapply(true, true, ops));
+  EXPECT_EQ(ops.log, "load stop start ");
+}
+
+TEST(WifiToggle, ReapplyWithClearedNetworkStops) {
+  WifiToggle t; FakeOps ops;
+  t.noteBoot(true);
+  ops.ssid = false;
+  EXPECT_FALSE(t.reapply(true, true, ops));
+  EXPECT_EQ(ops.log, "load stop detach ");
+}
+
+TEST(WifiToggle, ReapplyDoesNothingWhenNotRunning) {
+  WifiToggle t; FakeOps ops;
+  t.noteBoot(false);
+  EXPECT_FALSE(t.reapply(false, true, ops));
+  EXPECT_EQ(ops.log, "");
+}
+
 TEST(WifiPair, BothChangedRestarts) {
   EXPECT_TRUE(wifiPairChanged("NewNet", "newpass", "OldNet", "oldpass"));
 }

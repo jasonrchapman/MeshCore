@@ -39,6 +39,18 @@ public:
   // live: false on chips where the change waits for a reboot. Returns true if WiFi is on afterwards.
   bool set(bool on, bool running, bool live, Ops& ops) {
     ops.savePref(on);
+    return apply(on, running, live, ops);
+  }
+
+  // Settings changed by the app or the CLI: applies them to the running WiFi without saving the
+  // on/off choice (user rule, 2026-10-23). Does nothing when WiFi is not running.
+  bool reapply(bool running, bool live, Ops& ops) {
+    if (!running) return false;
+    return apply(true, running, live, ops);
+  }
+
+private:
+  bool apply(bool on, bool running, bool live, Ops& ops) {
     if (!live) return running;
     if (on) {
       if (!ops.loadSsid()) {   // no saved network: WiFi stays off
@@ -59,7 +71,6 @@ public:
     return false;
   }
 
-private:
   bool _noted = false;
   bool _server_up = false;
 };
