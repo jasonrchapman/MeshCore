@@ -1,6 +1,7 @@
 #include "LocalTime.h"
 
 #include <Arduino.h>  // chip-family macros (sdkconfig.h on ESP32)
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -47,39 +48,52 @@ static long daysFromCivil(int y, int m, int d) {
 }
 #endif
 
-void LocalTime::update(uint32_t utc, bool have_fix, long lat_e6, long lon_e6) {
-#ifdef LOCALTIME_GRID
-  int rule = have_fix ? lookupRule(lat_e6, lon_e6) : _rule;
-  if (rule == _rule && utc < _valid_until) return;
-  _rule = rule;
-  _valid_until = (utc / 900 + 1) * 900;  // next quarter hour
+void LocalTime::applyFallback(int8_t hours) {
+  _offset = (int32_t)hours * 3600;
+  if (hours == 0) strcpy(_abbr, "UTC");
+  else snprintf(_abbr, sizeof(_abbr), "%c%02d00", hours < 0 ? '-' : '+', hours < 0 ? -hours : hours);
+}
 
-  if (rule == 0) {
-    _offset = 0;
-    strcpy(_abbr, "UTC");
+void LocalTime::update(uint32_t utc, bool have_fix, long lat_e6, long lon_e6, int8_t fallback_hours) {
+#ifdef LOCALTIME_GRID
+  if (have_fix || _have_gps_zone) {
+    bool first = !_have_gps_zone;
+    _have_gps_zone = true;
+    int rule = have_fix ? lookupRule(lat_e6, lon_e6) : _rule;
+    if (!first && rule == _rule && utc < _valid_until) return;
+    _rule = rule;
+    _valid_until = (utc / 900 + 1) * 900;  // next quarter hour
+
+    if (rule == 0) {
+      _offset = 0;
+      strcpy(_abbr, "UTC");
+      return;
+    }
+
+    // Apply the zone's rule just long enough to convert, then restore whatever TZ was before.
+    const char* prev = getenv("TZ");
+    char saved[48] = "";
+    if (prev) strncpy(saved, prev, sizeof(saved) - 1);
+    setenv("TZ", TZ_RULES[rule], 1);
+    tzset();
+    time_t t = (time_t)utc;
+    struct tm tm;
+    localtime_r(&t, &tm);
+    strftime(_abbr, sizeof(_abbr), "%Z", &tm);
+    if (prev) setenv("TZ", saved, 1);
+    else unsetenv("TZ");
+    tzset();
+
+    int64_t local = (int64_t)daysFromCivil(tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday) * 86400
+                  + tm.tm_hour * 3600 + tm.tm_min * 60 + tm.tm_sec;  // 64-bit: past 2038 on 32-bit long
+    _offset = (int32_t)(local - (int64_t)utc);
     return;
   }
-
-  // Apply the zone's rule just long enough to convert, then restore whatever TZ was before.
-  const char* prev = getenv("TZ");
-  char saved[48] = "";
-  if (prev) strncpy(saved, prev, sizeof(saved) - 1);
-  setenv("TZ", TZ_RULES[rule], 1);
-  tzset();
-  time_t t = (time_t)utc;
-  struct tm tm;
-  localtime_r(&t, &tm);
-  strftime(_abbr, sizeof(_abbr), "%Z", &tm);
-  if (prev) setenv("TZ", saved, 1);
-  else unsetenv("TZ");
-  tzset();
-
-  int64_t local = (int64_t)daysFromCivil(tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday) * 86400
-                + tm.tm_hour * 3600 + tm.tm_min * 60 + tm.tm_sec;  // 64-bit: past 2038 on 32-bit long
-  _offset = (int32_t)(local - (int64_t)utc);
 #else
-  (void)utc; (void)have_fix; (void)lat_e6; (void)lon_e6;
+  (void)have_fix; (void)lat_e6; (void)lon_e6;
 #endif
+  (void)utc;
+  applyFallback(fallback_hours);
 }
 
 bool clockIsReal(uint32_t now) { return clockIsRealAt(now, LOCALTIME_BUILD_EPOCH); }

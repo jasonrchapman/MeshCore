@@ -62,7 +62,8 @@ static LocalTime local_time;
 static uint32_t localNow(uint32_t utc) {
   LocationProvider* gps = sensors.getLocationProvider();
   bool fix = gps && gps->isValid();
-  local_time.update(utc, fix, fix ? gps->getLatitude() : 0, fix ? gps->getLongitude() : 0);
+  local_time.update(utc, fix, fix ? gps->getLatitude() : 0, fix ? gps->getLongitude() : 0,
+                    the_mesh.getNodePrefs()->tz_offset);   // upstream's companion setting, whole hours
   return local_time.toLocal(utc);
 }
 

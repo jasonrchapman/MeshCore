@@ -50,6 +50,57 @@ TEST(LocalTime, TzStaysUnset) {
   EXPECT_EQ(getenv("TZ"), nullptr);
 }
 
+TEST(LocalTimeFallback, ZeroIsUtc) {
+  LocalTime lt;
+  lt.update(JUL_1_2026, false, 0, 0, 0);
+  EXPECT_STREQ(lt.zoneName(), "UTC");
+  EXPECT_EQ(lt.toLocal(JUL_1_2026), JUL_1_2026);
+}
+
+TEST(LocalTimeFallback, NegativeOffset) {
+  LocalTime lt;
+  lt.update(JUL_1_2026, false, 0, 0, -6);
+  EXPECT_STREQ(lt.zoneName(), "-0600");
+  EXPECT_EQ((int32_t)(lt.toLocal(JUL_1_2026) - JUL_1_2026), -6 * 3600);
+}
+
+TEST(LocalTimeFallback, PositiveAndEdgeOffsets) {
+  LocalTime lt;
+  lt.update(JUL_1_2026, false, 0, 0, 5);
+  EXPECT_STREQ(lt.zoneName(), "+0500");
+  lt.update(JUL_1_2026, false, 0, 0, 14);
+  EXPECT_STREQ(lt.zoneName(), "+1400");
+  lt.update(JUL_1_2026, false, 0, 0, -12);
+  EXPECT_STREQ(lt.zoneName(), "-1200");
+}
+
+TEST(LocalTimeFallback, ChangeAppliesAtOnce) {
+  LocalTime lt;
+  lt.update(JUL_1_2026, false, 0, 0, 2);
+  lt.update(JUL_1_2026 + 1, false, 0, 0, 3);
+  EXPECT_STREQ(lt.zoneName(), "+0300");
+}
+
+TEST(LocalTimeFallback, FixWinsOverOffset) {
+  LocalTime lt;
+  lt.update(JUL_1_2026, false, 0, 0, 3);
+  lt.update(JUL_1_2026 + 60, true, CHICAGO_LAT, CHICAGO_LON, 3);
+  EXPECT_STREQ(lt.zoneName(), "CDT");
+}
+
+TEST(LocalTimeFallback, LostFixKeepsGpsZoneNotOffset) {
+  LocalTime lt;
+  lt.update(JUL_1_2026, true, CHICAGO_LAT, CHICAGO_LON, 3);
+  lt.update(JUL_1_2026 + 3600, false, 0, 0, 3);
+  EXPECT_STREQ(lt.zoneName(), "CDT");
+}
+
+TEST(LocalTimeFallback, FourArgumentCallStaysUtc) {   // repeater and room server
+  LocalTime lt;
+  lt.update(JUL_1_2026, false, 0, 0);
+  EXPECT_STREQ(lt.zoneName(), "UTC");
+}
+
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

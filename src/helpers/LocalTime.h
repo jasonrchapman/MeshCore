@@ -13,8 +13,9 @@
 class LocalTime {
 public:
   // Call before drawing. have_fix/lat/lon from the LocationProvider (millionths of a degree).
-  // Without a fix the last zone found this boot is kept; before the first fix it is UTC.
-  void update(uint32_t utc, bool have_fix, long lat_e6, long lon_e6);
+  // Once a fix gives a zone, it is kept until the next fix or a reboot. Before that, the clock uses
+  // fallback_hours (the companion's tz_offset), and UTC when that is 0.
+  void update(uint32_t utc, bool have_fix, long lat_e6, long lon_e6, int8_t fallback_hours = 0);
 
   uint32_t toLocal(uint32_t utc) const { return utc + _offset; }
   const char* zoneName() const { return _abbr; }  // e.g. "CDT", "+0530", or "UTC"
@@ -24,6 +25,8 @@ private:
   uint32_t _valid_until = 0;  // recompute _offset/_abbr at or after this UTC time
   int32_t _offset = 0;        // local minus UTC, seconds
   char _abbr[8] = "UTC";
+  bool _have_gps_zone = false;   // a fix gave a zone during this boot
+  void applyFallback(int8_t hours);
 };
 
 // --- Clock-is-set check (our addition) ---
