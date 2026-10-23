@@ -104,6 +104,11 @@ void wifiLinkLoop() {
     act(wl_retry.onDisconnected(now, isWrongPassword(wl_ev_reason)));
   }
   act(wl_retry.poll(now));
+  // The framework retries the first failed join of a boot by itself, on the event task, and that can
+  // restart the radio after our radioOff(). So make sure it is really off while the rules say off.
+  WifiRetry::State st = wl_retry.state();
+  if ((st == WifiRetry::WAITING || st == WifiRetry::GAVE_UP || st == WifiRetry::OFF) && WiFi.getMode() != WIFI_OFF)
+    radioOff();
 #ifdef OURS_LOOP_PROBE
   probe(now);
 #endif
