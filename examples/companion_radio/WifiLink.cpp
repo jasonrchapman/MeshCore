@@ -56,6 +56,9 @@ void wifiLinkEarlyInit() {
       if (reason == WIFI_REASON_ASSOC_LEAVE) return;   // our own disconnect, as the framework also ignores it
       wl_ev_reason = reason;
       wl_ev_disconnected = true;
+    } else if (event == ARDUINO_EVENT_WIFI_STA_LOST_IP) {   // lease lost: a drop that is not a wrong password
+      wl_ev_reason = 0;
+      wl_ev_disconnected = true;
     }
   });
 }
