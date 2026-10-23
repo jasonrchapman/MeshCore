@@ -49,6 +49,7 @@ public:
   // BaseSerialInterface methods
   void enable() override;
   void disable() override;
+  void stopClient();   // our addition: close the app client (WiFi off, or the link is lost)
   bool isEnabled() const override { return _isEnabled; }
 
   bool isConnected() const override;

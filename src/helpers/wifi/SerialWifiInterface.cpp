@@ -18,6 +18,15 @@ void SerialWifiInterface::disable() {
   _isEnabled = false;
 }
 
+// our addition: close the app client. A write to a client whose link is gone can block loop()
+// for up to 10 s (WiFiClient retries), so the client goes as soon as WiFi goes off or drops.
+void SerialWifiInterface::stopClient() {
+  deviceConnected = false;
+  client.stop();
+  resetReceivedFrameHeader();
+  send_queue_len = 0;
+}
+
 size_t SerialWifiInterface::writeFrame(const uint8_t src[], size_t len) {
   if (len > MAX_FRAME_SIZE) {
     WIFI_DEBUG_PRINTLN("writeFrame(), frame too big, len=%d\n", len);
@@ -53,6 +62,12 @@ void SerialWifiInterface::resetReceivedFrameHeader() {
 }
 
 size_t SerialWifiInterface::checkRecvFrame(uint8_t dest[]) {
+  if (deviceConnected && WiFi.status() != WL_CONNECTED) {   // our addition: the link is gone
+    WIFI_DEBUG_PRINTLN("WiFi link lost, closing the app client");
+    stopClient();
+    return 0;
+  }
+
   // check if new client connected
   auto newClient = server.available();
   if (newClient) {
