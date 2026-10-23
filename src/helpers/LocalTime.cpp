@@ -81,3 +81,5 @@ void LocalTime::update(uint32_t utc, bool have_fix, long lat_e6, long lon_e6) {
   (void)utc; (void)have_fix; (void)lat_e6; (void)lon_e6;
 #endif
 }
+
+bool clockIsReal(uint32_t now) { return clockIsRealAt(now, LOCALTIME_BUILD_EPOCH); }

@@ -13,9 +13,8 @@ extern MyMesh the_mesh;
   #define BATT_MAX_MILLIVOLTS 4200
 #endif
 
-// RTC values before this are the ESP32 boot seed (2024-05-15) plus uptime, not a real sync.
-#ifndef RTC_SANE_EPOCH
-  #define RTC_SANE_EPOCH 1767225600UL   // 2026-01-01 00:00:00 UTC
+#ifdef RTC_TIME_MIN
+static_assert(RTC_TIME_MIN < LOCALTIME_BUILD_EPOCH, "upstream's start time must be older than this build");
 #endif
 
 // Display-only local time from the GPS position (see LocalTime.h). The RTC stays UTC.
@@ -125,7 +124,7 @@ void UITask::drawHeader(const char* title) {
   // Local time for the GPS position; "Z" marks UTC when there is no zone. The RTC holds UTC;
   // on ESP32 that is a fixed boot-time seed until GPS or an admin `time` command sets it.
   uint32_t now = the_mesh.getRTCClock()->getCurrentTime();
-  if (now < RTC_SANE_EPOCH) strcpy(buf, "--:--");  // clock not set
+  if (!clockIsReal(now)) strcpy(buf, "--:--");  // clock not set
   else {
     now = localNow(now);
     sprintf(buf, "%02lu:%02lu%s", (unsigned long)((now % 86400UL) / 3600), (unsigned long)((now % 3600UL) / 60),

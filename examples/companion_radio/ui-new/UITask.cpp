@@ -8,9 +8,8 @@
   #include <WiFi.h>
 #endif
 
-// RTC values before this are the ESP32 boot seed (2024-05-15) plus uptime, not a real sync.
-#ifndef RTC_SANE_EPOCH
-  #define RTC_SANE_EPOCH 1767225600UL   // 2026-01-01 00:00:00 UTC
+#ifdef RTC_TIME_MIN
+static_assert(RTC_TIME_MIN < LOCALTIME_BUILD_EPOCH, "upstream's start time must be older than this build");
 #endif
 
 #ifndef AUTO_OFF_MILLIS
@@ -438,7 +437,7 @@ public:
       // ESP32 it holds a boot-time seed until GPS or the app sets the time.
       uint32_t now = _rtc->getCurrentTime();
       char hhmm[8], date[24];
-      bool clock_set = now >= RTC_SANE_EPOCH;
+      bool clock_set = clockIsReal(now);
       if (clock_set) now = localNow(now);
       if (clock_set) sprintf(hhmm, "%02lu:%02lu", (unsigned long)((now % 86400UL) / 3600), (unsigned long)((now % 3600UL) / 60));
       else strcpy(hhmm, "--:--");  // clock not set
