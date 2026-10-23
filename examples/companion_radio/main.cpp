@@ -37,6 +37,7 @@ MultiSerialInterface interface_manager;
 
 // include wifi interface
 #ifdef ENABLE_WIFI_INTERFACE
+  #include "WifiLink.h"   // our addition: retry rules
   #ifndef WIFI_SSID
     #define WIFI_SSID ""
   #endif
@@ -313,6 +314,9 @@ void loop() {
   }
 
 #ifdef ENABLE_WIFI_INTERFACE
+  #if defined(ESP32)
+  wifiLinkLoop();   // our addition: the retry rules in WifiRetry.h replace the 10 s retry below
+  #else
   if (wifi_enabled) {
     // RP2040 has no WiFi event callbacks, so poll the link state instead
   #if defined(RP2040_PLATFORM)
@@ -341,5 +345,6 @@ void loop() {
       last_wifi_reconnect_attempt = millis();
     }
   }
+  #endif
 #endif
 }
