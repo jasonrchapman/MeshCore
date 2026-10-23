@@ -44,9 +44,10 @@ static void act(WifiRetry::Action a) {
   }
 }
 
-static void initOnce() {
-  if (wl_init) return;
-  wl_init = true;
+void wifiLinkEarlyInit() {
+  static bool registered = false;
+  if (registered) return;
+  registered = true;
   WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {   // runs on the Arduino event task
     if (event == ARDUINO_EVENT_WIFI_STA_GOT_IP) {
       wl_ev_connected = true;
@@ -57,6 +58,12 @@ static void initOnce() {
       wl_ev_disconnected = true;
     }
   });
+}
+
+static void initOnce() {
+  if (wl_init) return;
+  wl_init = true;
+  wifiLinkEarlyInit();                  // normally done by setup() already
   wl_boot_started = wifi_enabled && wifi_ssid[0];
   if (wl_boot_started) {                // setup() already began the first try
     WiFi.setAutoReconnect(false);

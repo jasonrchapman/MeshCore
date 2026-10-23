@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include "WifiRetry.h"
 
+void wifiLinkEarlyInit();             // registers the WiFi event handler, call in setup() before WiFi.begin()
 void wifiLinkLoop();                  // events, retry rules and the test probe; call from loop()
 void wifiLinkStart();                 // rules on, radio on, first try with the live wifi_ssid/wifi_pwd
 void wifiLinkStop();                  // rules off, client closed, radio off

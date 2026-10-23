@@ -223,6 +223,9 @@ void setup() {
     strcpy(wifi_pwd, the_mesh.getNodePrefs()->wifi_pwd);
   }
   // only start wifi if enabled and ssid is not empty
+#if defined(ESP32)
+  wifiLinkEarlyInit();   // our addition: our WiFi event handler must exist before WiFi.begin() below
+#endif
   wifi_enabled = the_mesh.getNodePrefs()->wifi_enabled;
   if (wifi_enabled && wifi_ssid[0]) {
 #if defined(ESP32)
