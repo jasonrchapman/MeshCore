@@ -28,6 +28,11 @@ static bool isWrongPassword(uint8_t r) {
          r == WIFI_REASON_HANDSHAKE_TIMEOUT;
 }
 
+// Known framework issue (arduino-esp32 2.0.17, measured 2026-10-27): WiFi.mode(WIFI_OFF) runs
+// esp_wifi_deinit(), and while Bluetooth runs each call loses 48 bytes of heap. Stopping without
+// the deinit avoids it, but keeps about 21 KB in use while WiFi is off, so we accept the loss.
+// Rough estimate: about 400 offs between reboots. Measurements: tools/wifi-leak-sketch in the
+// management repo.
 static void radioOff() {
   wifi_interface.stopClient();   // a write to a dead client can block loop() for seconds
   WiFi.disconnect(true);
