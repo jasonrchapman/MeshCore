@@ -51,6 +51,15 @@ static bool gpsActive() {
   }
   return false;
 }
+
+// Long press on the GPS page: the same steps as the `gps on` / `gps off` commands (CommonCLI.cpp).
+static void toggleGps(NodePrefs* prefs) {
+  bool on = !gpsActive();
+  if (sensors.setSettingValue("gps", on ? "1" : "0")) {
+    prefs->gps_enabled = on ? 1 : 0;
+    the_mesh.savePrefs();
+  }
+}
 #endif
 
 #ifndef USER_BTN_PRESSED
@@ -77,11 +86,29 @@ static const uint8_t meshcore_logo [] PROGMEM = {
     0xe3, 0xe3, 0x8f, 0xff, 0x1f, 0xfc, 0x3c, 0x0e, 0x1f, 0xf8, 0xff, 0xf8, 0x70, 0x3c, 0x7f, 0xf8, 
 };
 
+// 32x32 power icon, copied from the companion (ui-new/icons.h power_icon) for the Shutdown page.
+static const uint8_t power_icon[] = {
+    0x00, 0x01, 0x80, 0x00, 0x00, 0x03, 0xC0, 0x00, 0x00, 0x03, 0xC0, 0x00,
+    0x00, 0x33, 0xCC, 0x00, 0x00, 0xF3, 0xCF, 0x00, 0x01, 0xF3, 0xCF, 0x80,
+    0x03, 0xF3, 0xCF, 0xC0, 0x07, 0xF3, 0xCF, 0xE0, 0x0F, 0xE3, 0xC7, 0xF0,
+    0x1F, 0xC3, 0xC3, 0xF8, 0x1F, 0x83, 0xC1, 0xF8, 0x3F, 0x03, 0xC0, 0xFC,
+    0x3E, 0x03, 0xC0, 0x7C, 0x3E, 0x03, 0xC0, 0x7C, 0x7E, 0x01, 0x80, 0x7E,
+    0x7C, 0x00, 0x00, 0x3E, 0x7C, 0x00, 0x00, 0x3E, 0x7C, 0x00, 0x00, 0x3E,
+    0x7C, 0x00, 0x00, 0x3E, 0x7C, 0x00, 0x00, 0x3E, 0x3E, 0x00, 0x00, 0x7C,
+    0x3E, 0x00, 0x00, 0x7C, 0x3F, 0x00, 0x00, 0xFC, 0x1F, 0x80, 0x01, 0xF8,
+    0x1F, 0xC0, 0x03, 0xF8, 0x0F, 0xE0, 0x07, 0xF0, 0x0F, 0xF8, 0x1F, 0xF0,
+    0x07, 0xFF, 0xFF, 0xE0, 0x03, 0xFF, 0xFF, 0xC0, 0x00, 0xFF, 0xFF, 0x00,
+    0x00, 0x3F, 0xFC, 0x00, 0x00, 0x0F, 0xF0, 0x00,
+};
+
 void UITask::begin(NodePrefs* node_prefs, const char* build_date, const char* firmware_version) {
   _prevBtnState = HIGH;
   _auto_off = millis() + AUTO_OFF_MILLIS;
   _node_prefs = node_prefs;
   _display->turnOn();
+#if defined(PIN_USER_BTN) && defined(DISPLAY_CLASS)
+  user_btn.begin();   // our addition: the shared button with long press, double click and debounce
+#endif
 
   // strip off dash and commit hash by changing dash to null terminator
   // e.g: v1.2.3-abcdef -> v1.2.3
@@ -318,6 +345,20 @@ void UITask::renderCurrScreen() {
         break;
       }
 #endif
+      case PAGE_SHUTDOWN: {
+        drawHeader("SHUTDOWN");
+        drawBreadcrumb();
+        // Same page body as the companion's HomePage::SHUTDOWN (ui-new/UITask.cpp).
+        if (_shutdown_init) {
+          _display->setColor(UIColor::warning_txt);
+          _display->drawTextCentered(_display->width() / 2, 34, "hibernating...");
+        } else {
+          _display->setColor(UIColor::secondary_txt);
+          _display->drawXbm((_display->width() - 32) / 2, 18, power_icon, 32, 32);
+          _display->drawTextCentered(_display->width() / 2, 64 - 11, "hibernate: long press");
+        }
+        break;
+      }
       default:
         break;
     }
@@ -325,21 +366,32 @@ void UITask::renderCurrScreen() {
 }
 
 void UITask::loop() {
-#ifdef PIN_USER_BTN
-  if (millis() >= _next_read) {
-    int btnState = digitalRead(PIN_USER_BTN);
-    if (btnState != _prevBtnState) {
-      if (btnState == USER_BTN_PRESSED) {  // pressed?
-        if (_display->isOn()) {
-          _page = (_page + 1) % PAGE_COUNT;
-        } else {
-          _display->turnOn();
-        }
-        _auto_off = millis() + AUTO_OFF_MILLIS;   // extend auto-off timer
-      }
-      _prevBtnState = btnState;
+#if defined(PIN_USER_BTN) && defined(DISPLAY_CLASS)
+  // Same buttons as the companion: click = next page, double click = previous page, long press =
+  // the page's action (GPS page: GPS on/off, Shutdown page: power off). With the display off, any
+  // press only turns it on.
+  int ev = user_btn.check();
+  if (ev == BUTTON_EVENT_CLICK || ev == BUTTON_EVENT_DOUBLE_CLICK || ev == BUTTON_EVENT_LONG_PRESS) {
+    if (!_display->isOn()) {
+      _display->turnOn();
+    } else if (ev == BUTTON_EVENT_CLICK) {
+      _page = (_page + 1) % PAGE_COUNT;
+    } else if (ev == BUTTON_EVENT_DOUBLE_CLICK) {
+      _page = (_page + PAGE_COUNT - 1) % PAGE_COUNT;
+#if ENV_INCLUDE_GPS == 1
+    } else if (_page == PAGE_GPS) {
+      toggleGps(_node_prefs);
+#endif
+    } else if (_page == PAGE_SHUTDOWN) {
+      _shutdown_init = true;   // power off once the button is released, as the companion does
     }
-    _next_read = millis() + 200;  // 5 reads per second
+    _auto_off = millis() + AUTO_OFF_MILLIS;   // extend auto-off timer
+    _next_refresh = 0;                        // show the change now
+  }
+  if (_shutdown_init && !user_btn.isPressed()) {
+    _display->startFrame();   // blank the display before power off, as the companion's shutdown()
+    _display->endFrame();
+    board.powerOff();  // should not return
   }
 #endif
 

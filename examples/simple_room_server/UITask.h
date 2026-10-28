@@ -11,11 +11,13 @@ class UITask {
   char _version_info[32];
   uint16_t _batt_mv = 0;
   unsigned long _next_batt_read = 0;
+  bool _shutdown_init = false;   // Shutdown page: power off once the button is released
   enum Page {
     PAGE_IDENTITY, PAGE_MEMBERS, PAGE_STORAGE, PAGE_TRAFFIC, PAGE_SYSTEM,
 #if ENV_INCLUDE_GPS == 1
     PAGE_GPS,
 #endif
+    PAGE_SHUTDOWN,
     PAGE_COUNT
   };
   uint8_t _page = PAGE_IDENTITY;
